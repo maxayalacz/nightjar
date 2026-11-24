@@ -137,6 +137,7 @@ public abstract class NightjarActivity extends AppCompatActivity {
         refreshAppearance();
         followForm();
         hideBarsOnForcedTelevision();
+        PortalBackgroundHelper.onResume(this);
         if (!(this instanceof PairLinkActivity)) LinkGate.showWaiting(this);
     }
 
@@ -151,6 +152,7 @@ public abstract class NightjarActivity extends AppCompatActivity {
 
     @Override
     protected void onPause() {
+        PortalBackgroundHelper.onPause(this);
         dpadEchoes.reset();
         super.onPause();
     }
@@ -173,9 +175,16 @@ public abstract class NightjarActivity extends AppCompatActivity {
         shoulderStepping = false;
     }
 
+    @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+        PortalShaderView.markUserInteraction();
+        return super.dispatchTouchEvent(ev);
+    }
+
     /** A pad that reports its D-pad as keys and as a hat must not move the focus twice. */
     @Override
     public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        PortalShaderView.markUserInteraction();
         return dpadEchoes.drop(event) || shoulderStep(event) || super.dispatchKeyEvent(event);
     }
 

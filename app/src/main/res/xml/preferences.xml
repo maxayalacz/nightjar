@@ -880,6 +880,10 @@
         <!-- System, Dark or OLED black, stored under theme (ThemeChoice). -->
         <Preference android:key="theme"
             android:title="@string/title_theme" android:persistent="false" />
+        <Preference android:key="theme_studio"
+            android:title="@string/title_theme_studio"
+            android:summary="@string/summary_theme_studio"
+            android:persistent="false" />
         <com.limelight.preferences.LanguagePreference
             android:key="list_languages"
             android:title="@string/title_language_list"

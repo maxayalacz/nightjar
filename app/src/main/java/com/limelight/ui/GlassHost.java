@@ -71,7 +71,16 @@ public class GlassHost extends FrameLayout {
     }
 
     boolean isLive() {
-        return (tier == GlassTier.LENS || tier == GlassTier.LIVE) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
+        return (tier == GlassTier.LENS || tier == GlassTier.LIVE)
+                && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                && AppThemePalette.isLiveBlurEffective(getContext());
+    }
+
+    /** Reloads GlassSpec and invalidates all child GlassSurfaces after Theme Studio changes. */
+    public void refreshGlass() {
+        if (!isLive() && live != null) live = null;
+        for (GlassSurface surface : surfaces) surface.onTierChanged();
+        invalidate();
     }
 
     /** The ambient the baked tier samples; {@code animate} crossfades to it. */

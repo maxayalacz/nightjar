@@ -277,4 +277,125 @@ public class UiHelper {
         }
         confirm.setTextColor(androidx.core.content.ContextCompat.getColor(dialog.getContext(), R.color.nj_color_on_danger_fill));
     }
+
+    public static float dpToPx(Context context, float dp) {
+        return dp * context.getResources().getDisplayMetrics().density;
+    }
+
+    public static void disableAllActivityTransitions(Activity activity) {
+        if (activity == null) return;
+        disableActivityTransition(activity, false);
+        disableActivityTransition(activity, true);
+    }
+
+    @SuppressWarnings("deprecation")
+    public static void disableActivityTransition(Activity activity, boolean close) {
+        if (activity == null) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            activity.overrideActivityTransition(
+                    close ? Activity.OVERRIDE_TRANSITION_CLOSE : Activity.OVERRIDE_TRANSITION_OPEN,
+                    0, 0);
+        } else {
+            activity.overridePendingTransition(0, 0);
+        }
+    }
+
+    public static void applyMenuImmersiveMode(Activity activity) {
+        if (activity == null || activity.getWindow() == null) return;
+        WindowCompat.setDecorFitsSystemWindows(activity.getWindow(), false);
+        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(
+                activity.getWindow(), activity.getWindow().getDecorView());
+        if (controller != null) {
+            com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(activity);
+            controller.setAppearanceLightStatusBars(palette.isLight);
+            controller.setAppearanceLightNavigationBars(palette.isLight);
+        }
+    }
+
+    public static void styleDialogSquircle(android.app.Dialog dialog) {
+        if (dialog == null || dialog.getWindow() == null) return;
+        Context context = dialog.getContext();
+        com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(context);
+        boolean blurEffective = com.limelight.ui.AppThemePalette.isLiveBlurEffective(context);
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        bg.setCornerRadius(dpToPx(context, 28f));
+        bg.setColor(palette.getDialogSurfaceColor(blurEffective));
+        float outlineScale = Math.max(0f, PreferenceConfiguration.readPreferences(context).cardOutlineThicknessPercent / 100f);
+        int strokePx = outlineScale <= 0f ? 0 : Math.max(1, Math.round(dpToPx(context, 1.25f) * outlineScale));
+        if (strokePx > 0) bg.setStroke(strokePx, palette.cardOutline);
+        android.view.Window window = dialog.getWindow();
+        window.setBackgroundDrawable(bg);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            int blurPct = blurEffective
+                    ? Math.max(0, Math.min(2000, PreferenceConfiguration.readPreferences(context).blurAmountPercent))
+                    : 0;
+            int blurRadiusPx = blurPct <= 0 ? 0
+                    : Math.max(1, Math.round(dpToPx(context, Math.min(64f, 28f * (blurPct / 100f)))));
+            try {
+                window.setBackgroundBlurRadius(blurRadiusPx);
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    public static void fastBoxBlur(android.graphics.Bitmap bitmap, int radius) {
+        if (bitmap == null || radius < 1) return;
+        int w = bitmap.getWidth();
+        int h = bitmap.getHeight();
+        if (w <= 1 || h <= 1) return;
+        int[] pix = new int[w * h];
+        int[] tmp = new int[w * h];
+        fastBoxBlur(bitmap, radius, pix, tmp);
+    }
+
+    public static void fastBoxBlur(android.graphics.Bitmap bitmap, int radius, int[] pix, int[] tmp) {
+        if (bitmap == null || radius < 1) return;
+        int w = bitmap.getWidth();
+        int h = bitmap.getHeight();
+        if (w <= 1 || h <= 1) return;
+        int n = w * h;
+        if (pix == null || pix.length < n) pix = new int[n];
+        if (tmp == null || tmp.length < n) tmp = new int[n];
+        bitmap.getPixels(pix, 0, w, 0, 0, w, h);
+        int div = radius * 2 + 1;
+        for (int pass = 0; pass < 2; pass++) {
+            for (int y = 0; y < h; y++) {
+                int row = y * w;
+                int rSum = 0, gSum = 0, bSum = 0;
+                for (int i = -radius; i <= radius; i++) {
+                    int c = pix[row + Math.max(0, Math.min(w - 1, i))];
+                    rSum += (c >> 16) & 0xFF;
+                    gSum += (c >> 8) & 0xFF;
+                    bSum += c & 0xFF;
+                }
+                for (int x = 0; x < w; x++) {
+                    tmp[row + x] = 0xFF000000 | ((rSum / div) << 16) | ((gSum / div) << 8) | (bSum / div);
+                    int add = pix[row + Math.min(w - 1, x + radius + 1)];
+                    int rem = pix[row + Math.max(0, x - radius)];
+                    rSum += ((add >> 16) & 0xFF) - ((rem >> 16) & 0xFF);
+                    gSum += ((add >> 8) & 0xFF) - ((rem >> 8) & 0xFF);
+                    bSum += (add & 0xFF) - (rem & 0xFF);
+                }
+            }
+            for (int x = 0; x < w; x++) {
+                int rSum = 0, gSum = 0, bSum = 0;
+                for (int i = -radius; i <= radius; i++) {
+                    int c = tmp[Math.max(0, Math.min(h - 1, i)) * w + x];
+                    rSum += (c >> 16) & 0xFF;
+                    gSum += (c >> 8) & 0xFF;
+                    bSum += c & 0xFF;
+                }
+                for (int y = 0; y < h; y++) {
+                    pix[y * w + x] = 0xFF000000 | ((rSum / div) << 16) | ((gSum / div) << 8) | (bSum / div);
+                    int add = tmp[Math.min(h - 1, y + radius + 1) * w + x];
+                    int rem = tmp[Math.max(0, y - radius) * w + x];
+                    rSum += ((add >> 16) & 0xFF) - ((rem >> 16) & 0xFF);
+                    gSum += ((add >> 8) & 0xFF) - ((rem >> 8) & 0xFF);
+                    bSum += (add & 0xFF) - (rem & 0xFF);
+                }
+            }
+        }
+        bitmap.setPixels(pix, 0, w, 0, 0, w, h);
+    }
 }

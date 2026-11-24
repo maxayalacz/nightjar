@@ -1956,6 +1956,227 @@ public class PreferenceConfiguration {
             config.framePacing = FRAME_PACING_MIN_LATENCY;
         }
 
+        readPortalUiPreferences(context, prefs, config);
+
         return config;
+    }
+
+    // ---- Portal Shader, One UI Glass/Blur, Theme Studio & Stream Animations ----
+    public static final String PORTAL_READY_MS_PREF_STRING = "seekbar_portal_ready_ms";
+    public static final String PORTAL_CHARGE_MS_PREF_STRING = "seekbar_portal_charge_ms";
+    public static final String PORTAL_SONAR_HOLD_MS_PREF_STRING = "seekbar_portal_sonar_hold_ms";
+    public static final String PORTAL_PREVIEW_FADE_MS_PREF_STRING = "seekbar_portal_preview_fade_ms";
+    public static final String PORTAL_PREVIEW_HOLD_MS_PREF_STRING = "seekbar_portal_preview_hold_ms";
+    public static final String PORTAL_EXPAND_MS_PREF_STRING = "seekbar_portal_expand_ms";
+    public static final String PORTAL_SWIRL_SPEED_PREF_STRING = "seekbar_portal_swirl_speed";
+    public static final String PORTAL_DISCONNECT_MS_PREF_STRING = "seekbar_portal_disconnect_ms";
+    public static final String PORTAL_DISCONNECT_CLOSE_MS_PREF_STRING = "seekbar_portal_disconnect_close_ms";
+    public static final String PORTAL_DISCONNECT_FADE_MS_PREF_STRING = "seekbar_portal_disconnect_fade_ms";
+    public static final String PORTAL_DISCONNECT_OPEN_MS_PREF_STRING = "seekbar_portal_disconnect_open_ms";
+    public static final String PORTAL_LAUNCH_CLOSE_MS_PREF_STRING = "seekbar_portal_launch_close_ms";
+    public static final String PORTAL_PULSE_COIL_MS_PREF_STRING = "seekbar_portal_pulse_coil_ms";
+    public static final String PORTAL_DECOUPLE_PULSE_COIL_PREF_STRING = "checkbox_portal_decouple_pulse_coil";
+    public static final String PORTAL_WINDOW_SCALE_PREF_STRING = "seekbar_portal_window_scale";
+    public static final String PORTAL_GLOW_INTENSITY_PREF_STRING = "seekbar_portal_glow_intensity";
+    public static final String PORTAL_PARTICLE_BRIGHTNESS_PREF_STRING = "seekbar_portal_particle_brightness";
+    public static final String PORTAL_PARTICLE_SIZE_PREF_STRING = "seekbar_portal_particle_size";
+    public static final String PORTAL_PARTICLE_DENSITY_PREF_STRING = "seekbar_portal_particle_density";
+    public static final String PORTAL_SONAR_SPEED_PREF_STRING = "seekbar_portal_sonar_speed";
+    public static final String PORTAL_PULSE_AMOUNT_PREF_STRING = "seekbar_portal_pulse_amount";
+    public static final String PORTAL_PULSE_BRIGHTNESS_PREF_STRING = "seekbar_portal_pulse_brightness";
+    public static final String PORTAL_PULSE_LENGTH_PREF_STRING = "seekbar_portal_pulse_length";
+    public static final String PORTAL_PULSE_SPEED_PREF_STRING = "seekbar_portal_pulse_speed";
+    public static final String PORTAL_WAVE_AMP_PREF_STRING = "seekbar_portal_wave_amp";
+    public static final String BLUR_AMOUNT_PREF_STRING = "seekbar_blur_amount";
+    public static final String BLUR_SATURATION_PREF_STRING = "seekbar_blur_saturation";
+    public static final String FROSTED_TINT_AMOUNT_PREF_STRING = "seekbar_frosted_tint_amount";
+    public static final String BG_QUALITY_PREF_STRING = "list_bg_quality";
+    public static final String BG_RESOLUTION_PERCENT_PREF_STRING = "seekbar_bg_resolution_percent";
+    public static final String BLUR_RESOLUTION_PERCENT_PREF_STRING = "seekbar_blur_resolution_percent";
+    public static final String UI_FRAMERATE_PREF_STRING = "list_ui_framerate";
+    public static final String CARD_OUTLINE_THICKNESS_PREF_STRING = "seekbar_card_outline_thickness";
+    public static final String UI_PERFORMANCE_MODE_PREF_STRING = "checkbox_ui_performance_mode";
+    public static final String UI_BATTERY_SAVER_PREF_STRING = "list_ui_battery_saver";
+    public static final String PORTAL_SHOW_COVER_BACKDROP_PREF_STRING = "checkbox_portal_show_cover_backdrop";
+
+    public static final int DEFAULT_PORTAL_READY_MS = 450;
+    public static final int DEFAULT_PORTAL_CHARGE_MS = 1300;
+    public static final int DEFAULT_PORTAL_SONAR_HOLD_MS = 600;
+    public static final int DEFAULT_PORTAL_PREVIEW_FADE_MS = 1300;
+    public static final int DEFAULT_PORTAL_PREVIEW_HOLD_MS = 0;
+    public static final int DEFAULT_PORTAL_EXPAND_MS = 550;
+    public static final int DEFAULT_PORTAL_SWIRL_SPEED = 35;
+    public static final int DEFAULT_PORTAL_DISCONNECT_MS = 2000;
+    public static final int DEFAULT_PORTAL_DISCONNECT_CLOSE_MS = 450;
+    public static final int DEFAULT_PORTAL_DISCONNECT_FADE_MS = 350;
+    public static final int DEFAULT_PORTAL_DISCONNECT_OPEN_MS = 1200;
+    public static final int DEFAULT_PORTAL_LAUNCH_CLOSE_MS = 950;
+    public static final int DEFAULT_PORTAL_PULSE_COIL_MS = 1800;
+    public static final boolean DEFAULT_PORTAL_DECOUPLE_PULSE_COIL = false;
+    public static final int DEFAULT_PORTAL_WINDOW_SCALE = 100;
+    public static final int DEFAULT_PORTAL_GLOW_INTENSITY = 100;
+    public static final int DEFAULT_PORTAL_PARTICLE_BRIGHTNESS = 100;
+    public static final int DEFAULT_PORTAL_PARTICLE_SIZE = 100;
+    public static final int DEFAULT_PORTAL_PARTICLE_DENSITY = 100;
+    public static final int DEFAULT_PORTAL_SONAR_SPEED = 100;
+    public static final int DEFAULT_PORTAL_PULSE_AMOUNT = 7;
+    public static final int DEFAULT_PORTAL_PULSE_BRIGHTNESS = 95;
+    public static final int DEFAULT_PORTAL_PULSE_LENGTH = 100;
+    public static final int DEFAULT_PORTAL_PULSE_SPEED = 100;
+    public static final int DEFAULT_PORTAL_WAVE_AMP = 100;
+    public static final int DEFAULT_BLUR_AMOUNT = 100;
+    public static final int DEFAULT_BLUR_SATURATION = 140;
+    public static final int DEFAULT_FROSTED_TINT_AMOUNT = 35;
+    public static final String DEFAULT_BG_QUALITY = "720";
+    public static final int DEFAULT_BG_RESOLUTION_PERCENT = 65;
+    public static final int DEFAULT_BLUR_RESOLUTION_PERCENT = 15;
+    public static final String DEFAULT_UI_FRAMERATE = "60";
+    public static final int DEFAULT_CARD_OUTLINE_THICKNESS = 100;
+    public static final boolean DEFAULT_UI_PERFORMANCE_MODE = false;
+    public static final String DEFAULT_UI_BATTERY_SAVER = "auto";
+    public static final boolean DEFAULT_PORTAL_SHOW_COVER_BACKDROP = false;
+
+    public int portalReadyMs;
+    public int portalChargeMs;
+    public int portalSonarHoldMs;
+    public int portalPreviewFadeMs;
+    public int portalPreviewHoldMs;
+    public int portalExpandMs;
+    public int portalSwirlSpeedPercent;
+    public int portalDisconnectMs;
+    public int portalDisconnectCloseMs;
+    public int portalDisconnectFadeMs;
+    public int portalDisconnectOpenMs;
+    public int portalLaunchCloseMs;
+    public int portalPulseCoilMs;
+    public boolean portalDecouplePulseCoil;
+    public int portalWindowScalePercent;
+    public int portalGlowIntensityPercent;
+    public int portalParticleBrightnessPercent;
+    public int portalParticleSizePercent;
+    public int portalParticleDensityPercent;
+    public int portalSonarSpeedPercent;
+    public int portalPulseAmount;
+    public int portalPulseBrightnessPercent;
+    public int portalPulseLengthPercent;
+    public int portalPulseSpeedPercent;
+    public int portalWaveAmpPercent;
+    public int blurAmountPercent;
+    public int blurSaturationPercent;
+    public int frostedTintAmountPercent;
+    public int bgQualityMaxShortEdge;
+    public int bgResolutionPercent;
+    public int blurResolutionPercent;
+    public String uiFramerate;
+    public int cardOutlineThicknessPercent;
+    public boolean uiPerformanceMode;
+    public String uiBatterySaverMode;
+    public boolean isUiBatterySaverEffective;
+    public boolean isUiPerformanceModeEffective;
+    public boolean portalShowCoverBackdrop;
+
+    private static volatile long sLastPowerSaveCheckMs = 0L;
+    private static volatile boolean sLastPowerSaveState = false;
+
+    private static void readPortalUiPreferences(Context context, SharedPreferences prefs, PreferenceConfiguration config) {
+        config.portalReadyMs = prefs.getInt(PORTAL_READY_MS_PREF_STRING, DEFAULT_PORTAL_READY_MS);
+        config.portalChargeMs = prefs.getInt(PORTAL_CHARGE_MS_PREF_STRING, DEFAULT_PORTAL_CHARGE_MS);
+        config.portalSonarHoldMs = prefs.getInt(PORTAL_SONAR_HOLD_MS_PREF_STRING, DEFAULT_PORTAL_SONAR_HOLD_MS);
+        config.portalPreviewFadeMs = prefs.getInt(PORTAL_PREVIEW_FADE_MS_PREF_STRING, DEFAULT_PORTAL_PREVIEW_FADE_MS);
+        config.portalPreviewHoldMs = prefs.getInt(PORTAL_PREVIEW_HOLD_MS_PREF_STRING, DEFAULT_PORTAL_PREVIEW_HOLD_MS);
+        config.portalExpandMs = prefs.getInt(PORTAL_EXPAND_MS_PREF_STRING, DEFAULT_PORTAL_EXPAND_MS);
+        config.portalSwirlSpeedPercent = prefs.getInt(PORTAL_SWIRL_SPEED_PREF_STRING, DEFAULT_PORTAL_SWIRL_SPEED);
+        config.portalDisconnectMs = prefs.getInt(PORTAL_DISCONNECT_MS_PREF_STRING, DEFAULT_PORTAL_DISCONNECT_MS);
+        config.portalDisconnectCloseMs = prefs.getInt(PORTAL_DISCONNECT_CLOSE_MS_PREF_STRING, DEFAULT_PORTAL_DISCONNECT_CLOSE_MS);
+        config.portalDisconnectFadeMs = prefs.getInt(PORTAL_DISCONNECT_FADE_MS_PREF_STRING, DEFAULT_PORTAL_DISCONNECT_FADE_MS);
+        config.portalDisconnectOpenMs = prefs.getInt(PORTAL_DISCONNECT_OPEN_MS_PREF_STRING, DEFAULT_PORTAL_DISCONNECT_OPEN_MS);
+        config.portalLaunchCloseMs = prefs.getInt(PORTAL_LAUNCH_CLOSE_MS_PREF_STRING, DEFAULT_PORTAL_LAUNCH_CLOSE_MS);
+        config.portalPulseCoilMs = prefs.getInt(PORTAL_PULSE_COIL_MS_PREF_STRING, DEFAULT_PORTAL_PULSE_COIL_MS);
+        config.portalDecouplePulseCoil = prefs.getBoolean(PORTAL_DECOUPLE_PULSE_COIL_PREF_STRING, DEFAULT_PORTAL_DECOUPLE_PULSE_COIL);
+        config.portalWindowScalePercent = prefs.getInt(PORTAL_WINDOW_SCALE_PREF_STRING, DEFAULT_PORTAL_WINDOW_SCALE);
+        config.portalGlowIntensityPercent = prefs.getInt(PORTAL_GLOW_INTENSITY_PREF_STRING, DEFAULT_PORTAL_GLOW_INTENSITY);
+        config.portalParticleBrightnessPercent = prefs.getInt(PORTAL_PARTICLE_BRIGHTNESS_PREF_STRING, DEFAULT_PORTAL_PARTICLE_BRIGHTNESS);
+        config.portalParticleSizePercent = prefs.getInt(PORTAL_PARTICLE_SIZE_PREF_STRING, DEFAULT_PORTAL_PARTICLE_SIZE);
+        config.portalParticleDensityPercent = prefs.getInt(PORTAL_PARTICLE_DENSITY_PREF_STRING, DEFAULT_PORTAL_PARTICLE_DENSITY);
+        config.portalSonarSpeedPercent = prefs.getInt(PORTAL_SONAR_SPEED_PREF_STRING, DEFAULT_PORTAL_SONAR_SPEED);
+        config.portalPulseAmount = prefs.getInt(PORTAL_PULSE_AMOUNT_PREF_STRING, DEFAULT_PORTAL_PULSE_AMOUNT);
+        config.portalPulseBrightnessPercent = prefs.getInt(PORTAL_PULSE_BRIGHTNESS_PREF_STRING, DEFAULT_PORTAL_PULSE_BRIGHTNESS);
+        config.portalPulseLengthPercent = prefs.getInt(PORTAL_PULSE_LENGTH_PREF_STRING, DEFAULT_PORTAL_PULSE_LENGTH);
+        config.portalPulseSpeedPercent = prefs.getInt(PORTAL_PULSE_SPEED_PREF_STRING, DEFAULT_PORTAL_PULSE_SPEED);
+        config.portalWaveAmpPercent = prefs.getInt(PORTAL_WAVE_AMP_PREF_STRING, DEFAULT_PORTAL_WAVE_AMP);
+        config.blurAmountPercent = prefs.getInt(BLUR_AMOUNT_PREF_STRING, DEFAULT_BLUR_AMOUNT);
+        config.blurSaturationPercent = prefs.getInt(BLUR_SATURATION_PREF_STRING, DEFAULT_BLUR_SATURATION);
+        config.frostedTintAmountPercent = prefs.getInt(FROSTED_TINT_AMOUNT_PREF_STRING, -1);
+        try {
+            config.bgQualityMaxShortEdge = Integer.parseInt(prefs.getString(BG_QUALITY_PREF_STRING, DEFAULT_BG_QUALITY));
+        } catch (NumberFormatException e) {
+            config.bgQualityMaxShortEdge = 720;
+        }
+        if (prefs.contains(BG_RESOLUTION_PERCENT_PREF_STRING)) {
+            config.bgResolutionPercent = Math.max(25, Math.min(100,
+                    prefs.getInt(BG_RESOLUTION_PERCENT_PREF_STRING, DEFAULT_BG_RESOLUTION_PERCENT)));
+        } else {
+            if (config.bgQualityMaxShortEdge == 0) {
+                config.bgResolutionPercent = 100;
+            } else if (config.bgQualityMaxShortEdge >= 1080) {
+                config.bgResolutionPercent = 90;
+            } else if (config.bgQualityMaxShortEdge <= 540) {
+                config.bgResolutionPercent = 50;
+            } else {
+                config.bgResolutionPercent = DEFAULT_BG_RESOLUTION_PERCENT;
+            }
+        }
+        config.blurResolutionPercent = Math.max(5, Math.min(50,
+                prefs.getInt(BLUR_RESOLUTION_PERCENT_PREF_STRING, DEFAULT_BLUR_RESOLUTION_PERCENT)));
+        config.uiFramerate = prefs.getString(UI_FRAMERATE_PREF_STRING, DEFAULT_UI_FRAMERATE);
+        config.cardOutlineThicknessPercent = prefs.getInt(CARD_OUTLINE_THICKNESS_PREF_STRING, DEFAULT_CARD_OUTLINE_THICKNESS);
+        config.uiPerformanceMode = prefs.getBoolean(UI_PERFORMANCE_MODE_PREF_STRING, DEFAULT_UI_PERFORMANCE_MODE);
+        config.uiBatterySaverMode = prefs.getString(UI_BATTERY_SAVER_PREF_STRING, DEFAULT_UI_BATTERY_SAVER);
+        config.isUiBatterySaverEffective = isUiBatterySaverEffective(context, config.uiBatterySaverMode);
+        config.isUiPerformanceModeEffective = config.uiPerformanceMode && !config.isUiBatterySaverEffective;
+        config.portalShowCoverBackdrop = prefs.getBoolean(PORTAL_SHOW_COVER_BACKDROP_PREF_STRING, DEFAULT_PORTAL_SHOW_COVER_BACKDROP);
+    }
+
+    public static boolean isUiBatterySaverEffective(Context context) {
+        if (context == null) {
+            return false;
+        }
+        String mode = PreferenceManager.getDefaultSharedPreferences(context)
+                .getString(UI_BATTERY_SAVER_PREF_STRING, DEFAULT_UI_BATTERY_SAVER);
+        return isUiBatterySaverEffective(context, mode);
+    }
+
+    public static boolean isUiBatterySaverEffective(Context context, String mode) {
+        if ("on".equals(mode)) {
+            return true;
+        }
+        if ("off".equals(mode)) {
+            return false;
+        }
+        if (context != null) {
+            long now = android.os.SystemClock.uptimeMillis();
+            if ((now - sLastPowerSaveCheckMs) >= 1000L) {
+                try {
+                    android.os.PowerManager pm = (android.os.PowerManager) context.getSystemService(Context.POWER_SERVICE);
+                    sLastPowerSaveState = pm != null && pm.isPowerSaveMode();
+                } catch (Throwable ignored) {
+                    sLastPowerSaveState = false;
+                }
+                sLastPowerSaveCheckMs = now;
+            }
+            return sLastPowerSaveState;
+        }
+        return false;
+    }
+
+    public static boolean isUiPerformanceModeEffective(Context context) {
+        if (context == null) {
+            return false;
+        }
+        if (isUiBatterySaverEffective(context)) {
+            return false;
+        }
+        return PreferenceManager.getDefaultSharedPreferences(context)
+                .getBoolean(UI_PERFORMANCE_MODE_PREF_STRING, DEFAULT_UI_PERFORMANCE_MODE);
     }
 }

@@ -3060,6 +3060,14 @@ public class StreamSettings extends NightjarActivity {
                 });
                 return true;
             });
+            Preference themeStudioPref = findPreference("theme_studio");
+            if (themeStudioPref != null) {
+                themeStudioPref.setOnPreferenceClickListener(preference -> {
+                    Intent intent = new Intent(getActivity(), com.limelight.ui.ThemeStudioActivity.class);
+                    startActivity(intent);
+                    return true;
+                });
+            }
             findPreference(LOW_LATENCY_CUSTOMIZE_KEY).setOnPreferenceClickListener(preference -> {
                 StreamSettings activity = (StreamSettings) getActivity();
                 activity.customizeOpen = !activity.customizeOpen;
