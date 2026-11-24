@@ -246,12 +246,14 @@ public final class TileGrid extends ViewGroup {
         int side = res.getDimensionPixelSize(R.dimen.stream_tile_pad_side);
         tile.setPaddingRelative(side, res.getDimensionPixelSize(R.dimen.stream_tile_pad_top), side,
                 res.getDimensionPixelSize(R.dimen.stream_tile_pad_bottom));
+        AppThemePalette palette = AppThemePalette.getCurrent(context);
         int[][] states = {new int[] {android.R.attr.state_checked}, new int[] {}};
         android.content.res.ColorStateList ink = new android.content.res.ColorStateList(states, new int[] {
-                MaterialColors.getColor(context, R.attr.glassOnSelected, 0),
-                MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurface, 0)});
+                palette.highlight,
+                palette.getPrimaryTextColor()});
         tile.setTextColor(ink);
         tile.setIconTint(ink);
+        tile.setRippleColor(android.content.res.ColorStateList.valueOf((0x38 << 24) | (palette.accent & 0x00FFFFFF)));
         tile.setBackground(new GlassControlDrawable(context, GlassControlDrawable.Kind.CONTROL, res.getDimension(R.dimen.stream_tile_corner)));
         tile.setCapShown(capsShown);
         tile.setOn(on);
@@ -276,8 +278,8 @@ public final class TileGrid extends ViewGroup {
         text.append(detail);
         text.setSpan(new android.text.style.TextAppearanceSpan(context, R.style.TextAppearance_Nightjar_TileDetail),
                 start, text.length(), 0);
-        text.setSpan(new android.text.style.ForegroundColorSpan(MaterialColors.getColor(context,
-                com.google.android.material.R.attr.colorOnSurfaceVariant, 0)), start, text.length(), 0);
+        text.setSpan(new android.text.style.ForegroundColorSpan(
+                AppThemePalette.getCurrent(context).getSecondaryTextColor()), start, text.length(), 0);
         return text;
     }
 }

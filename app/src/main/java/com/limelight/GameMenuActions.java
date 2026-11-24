@@ -99,7 +99,8 @@ final class GameMenuActions {
 
     /** The stream menu is open: its bitrate slider already shows an applied rate, and a toast would cover its ways out. */
     boolean streamMenuOpen() {
-        return streamMenuSheet != null && streamMenuSheet.sheet().isShowing();
+        return (streamMenuSheet != null && streamMenuSheet.sheet().isShowing())
+                || (portalQuickMenu != null && portalQuickMenu.dialog().isShowing());
     }
 
     /**
@@ -138,6 +139,229 @@ final class GameMenuActions {
         }
     };
 
+    private final com.limelight.ui.PortalQuickMenu.Host portalQuickMenuHost = new com.limelight.ui.PortalQuickMenu.Host() {
+        private final int[] quickTouchCycle = {
+                com.limelight.binding.input.touch.TouchMode.MULTI_TOUCH,
+                com.limelight.binding.input.touch.TouchMode.TOUCHPAD,
+                com.limelight.binding.input.touch.TouchMode.TRACKPAD,
+                com.limelight.binding.input.touch.TouchMode.DIRECT,
+                com.limelight.binding.input.touch.TouchMode.LOCAL_CURSOR,
+                com.limelight.binding.input.touch.TouchMode.OFF
+        };
+
+        private android.content.SharedPreferences prefs() {
+            return android.preference.PreferenceManager.getDefaultSharedPreferences(game);
+        }
+
+        @Override
+        public int getTouchMode() {
+            return game.touchInput.touchMode();
+        }
+
+        @Override
+        public void cycleTouchMode() {
+            int cur = game.touchInput.touchMode();
+            int next = quickTouchCycle[0];
+            for (int i = 0; i < quickTouchCycle.length; i++) {
+                if (quickTouchCycle[i] == cur) {
+                    next = quickTouchCycle[(i + 1) % quickTouchCycle.length];
+                    break;
+                }
+            }
+            game.touchInput.applyTouchMode(next, !DualScreen.isSecond(game.getIntent()));
+            DualScreen.mirrorTouchMode(game, next);
+            String[] names = game.getResources().getStringArray(R.array.stream_touch_modes);
+            if (next >= 0 && next < names.length) {
+                game.messages.alert(names[next], Toast.LENGTH_SHORT);
+            }
+        }
+
+        @Override
+        public boolean isOscVisible() {
+            return game.prefConfig != null && game.prefConfig.onscreenController;
+        }
+
+        @Override
+        public void toggleOscLive() {
+            game.touchInput.setOnscreenControlsEnabled(!isOscVisible());
+        }
+
+        @Override
+        public boolean isPcKeyboardVisible() {
+            return game.keyboardInput.isPcKeyboardVisible();
+        }
+
+        @Override
+        public void sendClipboardLive() {
+            transferClipboard(true);
+        }
+
+        @Override
+        public void fetchClipboardLive() {
+            transferClipboard(false);
+        }
+
+        @Override
+        public void setOscOpacityLive(int opacity) {
+            int clamped = Math.max(0, Math.min(100, opacity));
+            if (game.prefConfig != null) game.prefConfig.oscOpacity = clamped;
+            prefs().edit().putInt("seekbar_osc_opacity", clamped).apply();
+            if (game.moonlightVirtualController != null) {
+                game.moonlightVirtualController.setOpacity(clamped);
+            }
+        }
+
+        @Override
+        public void setOscOutlineThicknessLive(int percent) {
+            int clamped = Math.max(0, Math.min(250, percent));
+            if (game.prefConfig != null) game.prefConfig.oscOutlineThicknessPercent = clamped;
+            prefs().edit().putInt(
+                    com.limelight.preferences.PreferenceConfiguration.OSC_OUTLINE_THICKNESS_PREF_STRING,
+                    clamped).apply();
+            if (game.moonlightVirtualController != null) {
+                game.moonlightVirtualController.refreshLayout();
+            }
+        }
+
+        @Override
+        public void setOscVibrateLive(boolean enabled) {
+            if (game.prefConfig != null) game.prefConfig.vibrateOsc = enabled;
+            prefs().edit().putBoolean("checkbox_vibrate_osc", enabled).apply();
+        }
+
+        @Override
+        public void setFreeAnalogStickLive(boolean enabled) {
+            if (game.prefConfig != null) game.prefConfig.enableNewAnalogStick = enabled;
+            prefs().edit().putBoolean("checkbox_enable_analog_stick_new", enabled).apply();
+            if (game.moonlightVirtualController != null) {
+                game.moonlightVirtualController.refreshLayout();
+            }
+        }
+
+        @Override
+        public void setOscLiveBlurLive(boolean enabled) {
+            if (game.prefConfig != null) game.prefConfig.oscLiveBlur = enabled;
+            prefs().edit().putBoolean(
+                    com.limelight.preferences.PreferenceConfiguration.OSC_LIVE_BLUR_PREF_STRING,
+                    enabled).apply();
+            if (game.moonlightVirtualController != null) {
+                game.moonlightVirtualController.refreshLayout();
+            }
+        }
+
+        @Override
+        public void setOscBlurAmountLive(int percent) {
+            int clamped = Math.max(0, Math.min(100, percent));
+            if (game.prefConfig != null) game.prefConfig.oscBlurAmountPercent = clamped;
+            prefs().edit().putInt(
+                    com.limelight.preferences.PreferenceConfiguration.OSC_BLUR_AMOUNT_PREF_STRING,
+                    clamped).apply();
+        }
+
+        @Override
+        public void setOscBlurResolutionPercentLive(int percent) {
+            int clamped = Math.max(5, Math.min(50, percent));
+            if (game.prefConfig != null) game.prefConfig.oscBlurResolutionPercent = clamped;
+            prefs().edit().putInt(
+                    com.limelight.preferences.PreferenceConfiguration.OSC_BLUR_RESOLUTION_PERCENT_PREF_STRING,
+                    clamped).apply();
+        }
+
+        @Override
+        public void setOscBlurFramerateLive(String fps) {
+            if (game.prefConfig != null) game.prefConfig.oscBlurFramerate = fps;
+            prefs().edit().putString(
+                    com.limelight.preferences.PreferenceConfiguration.OSC_BLUR_FRAMERATE_PREF_STRING,
+                    fps).apply();
+        }
+
+        @Override
+        public String getOscEngine() {
+            return game.prefConfig != null && game.prefConfig.oscEngine != null
+                    ? game.prefConfig.oscEngine
+                    : com.limelight.preferences.PreferenceConfiguration.DEFAULT_OSC_ENGINE;
+        }
+
+        @Override
+        public void setOscEngineLive(String engine) {
+            if (game.prefConfig != null) game.prefConfig.oscEngine = engine;
+            prefs().edit().putString(
+                    com.limelight.preferences.PreferenceConfiguration.OSC_ENGINE_PREF_STRING,
+                    engine).apply();
+            if (isOscVisible()) {
+                game.showOnscreenController();
+            }
+        }
+
+        @Override
+        public void setTrackpadSensitivityXLive(int percent) {
+            int clamped = Math.max(10, Math.min(300, percent));
+            if (game.prefConfig != null) game.prefConfig.trackpadSensitivityX = clamped;
+            prefs().edit().putInt("seekbar_trackpad_sensitivity_x", clamped).apply();
+            game.touchInput.initializeTouchContexts();
+        }
+
+        @Override
+        public void setTrackpadSensitivityYLive(int percent) {
+            int clamped = Math.max(10, Math.min(300, percent));
+            if (game.prefConfig != null) game.prefConfig.trackpadSensitivityY = clamped;
+            prefs().edit().putInt("seekbar_trackpad_sensitivity_y", clamped).apply();
+            game.touchInput.initializeTouchContexts();
+        }
+
+        @Override
+        public void setTrackpadSwapAxisLive(boolean enabled) {
+            if (game.prefConfig != null) game.prefConfig.trackpadSwapAxis = enabled;
+            prefs().edit().putBoolean("checkbox_trackpad_swap_axis", enabled).apply();
+            game.touchInput.initializeTouchContexts();
+        }
+
+        @Override
+        public void setFloatingMenuButtonLive(boolean enabled) {
+            game.touchInput.setMenuButtonShown(enabled);
+        }
+
+        @Override
+        public void setDisableWarningsLive(boolean enabled) {
+            if (game.prefConfig != null) game.prefConfig.disableWarnings = enabled;
+            prefs().edit().putBoolean("checkbox_disable_warnings", enabled).apply();
+        }
+
+        @Override
+        public void setCardOutlineThicknessLive(int percent) {
+            int clamped = Math.max(0, Math.min(250, percent));
+            if (game.prefConfig != null) game.prefConfig.cardOutlineThicknessPercent = clamped;
+            prefs().edit().putInt(
+                    com.limelight.preferences.PreferenceConfiguration.CARD_OUTLINE_THICKNESS_PREF_STRING,
+                    clamped).apply();
+        }
+
+        @Override
+        public void setUiPerformanceModeLive(boolean enabled) {
+            if (game.prefConfig != null) game.prefConfig.uiPerformanceMode = enabled;
+            prefs().edit().putBoolean(
+                    com.limelight.preferences.PreferenceConfiguration.UI_PERFORMANCE_MODE_PREF_STRING,
+                    enabled).apply();
+        }
+
+        @Override
+        public void setUiBatterySaverModeLive(String mode) {
+            if (game.prefConfig != null) game.prefConfig.uiBatterySaverMode = mode;
+            prefs().edit().putString(
+                    com.limelight.preferences.PreferenceConfiguration.UI_BATTERY_SAVER_PREF_STRING,
+                    mode).apply();
+        }
+
+        @Override
+        public void setPerformanceOverlayModeLive(String mode) {
+            if (mode == null) {
+                game.overlays.hidePerformanceOverlay();
+            } else {
+                game.overlays.showPerformanceOverlay(mode);
+            }
+        }
+    };
+
     void showStreamMenu(boolean byController) {
         if (!game.foreground || !game.connected || game.streamMenu != null) {
             return;
@@ -155,6 +379,7 @@ final class GameMenuActions {
                     game,
                     this::streamMenuOptions,
                     this::onStreamMenuItem,
+                    portalQuickMenuHost,
                     () -> {
                         portalQuickMenu = null;
                         game.streamMenuAction = () -> showClassicStreamMenu(byController);

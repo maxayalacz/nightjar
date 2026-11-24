@@ -102,6 +102,9 @@ public final class OneUiThemeApplier {
             ((CoverCard) view).refreshTheme(psv);
         }
         if (view instanceof PcRow) {
+            ((PcRow) view).refreshTheme(psv);
+        }
+        if (view.getId() == R.id.home_setup_card && !(view instanceof GlassSurface)) {
             applyFrostedCard(view, psv, FlowingAuroraView.CornerMode.ALL, 20f);
         }
         if (view instanceof GroupedListView) {

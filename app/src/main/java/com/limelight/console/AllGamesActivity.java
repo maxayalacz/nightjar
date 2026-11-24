@@ -254,7 +254,7 @@ public class AllGamesActivity extends NightjarActivity implements HostFeed.Liste
                     out.right = rtl ? start : slack - start;
                 }
             });
-            grid.setFadingEdgeLength(getResources().getDimensionPixelSize(R.dimen.all_games_fade) + room);
+            grid.setVerticalFadingEdgeEnabled(false);
             // The frame ends at the TV's safe edge, so a focused row's ring and glow fit whole. As the page's weighted last
             // child it ended the glow room short of the page's margin: a LinearLayout gives a negative margin no space.
             View gridFrame = (View) grid.getParent();

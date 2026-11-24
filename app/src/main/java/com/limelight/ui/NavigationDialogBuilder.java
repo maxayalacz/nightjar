@@ -59,17 +59,17 @@ public final class NavigationDialogBuilder extends MaterialAlertDialogBuilder {
         if (list != null) list.setSelector(R.drawable.dialog_row_focus);
         boolean onSky = ownSurface && !overStream;
         if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
             if (overStream || onSky) {
                 dialog.getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
             } else {
                 dialog.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-                dialog.getWindow().setDimAmount(0.38f);
+                dialog.getWindow().setDimAmount(0.35f);
             }
         }
         if (onSky) DialogSky.under(dialog);
         // Builds the views now: the buttons exist, and their bar can be laid out for capsules.
         dialog.create();
+        com.limelight.utils.UiHelper.styleDialogSquircle(dialog);
         styleButtons(dialog);
         DialogInterface.OnKeyListener custom = keyListener;
         DpadEchoFilter dpadEchoes = new DpadEchoFilter();

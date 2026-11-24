@@ -44,14 +44,17 @@ final class MenuBlurWindow {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && owner.getWindowManager().isCrossWindowBlurEnabled();
     }
 
+    private boolean bottomSquare;
+    private float cornerRadius;
+
     /** The window, shown and still empty, or null when this device cannot blur now. {@code onSwitch} hears the system turn it off and on. */
     static MenuBlurWindow openIfAllowed(Activity owner, int radius, Consumer<Boolean> onSwitch) {
         if (!allowed(Build.VERSION.SDK_INT, GlassTier.land(owner), systemSwitch(owner))) return null;
         if (!AppThemePalette.isLiveBlurEffective(owner)) return null;
         int blurPct = com.limelight.preferences.PreferenceConfiguration.readPreferences(owner).blurAmountPercent;
         if (blurPct <= 0) return null;
-        int scaledRadius = Math.max(1, Math.min(180, Math.round(radius * (blurPct / 100f))));
-        return new MenuBlurWindow(owner, scaledRadius, onSwitch);
+        int clampedRadius = Math.max(1, Math.min(180, radius));
+        return new MenuBlurWindow(owner, clampedRadius, onSwitch);
     }
 
     /**
@@ -93,14 +96,38 @@ final class MenuBlurWindow {
         params.width = 1;
         params.height = 1;
         w.setAttributes(params);
+        cornerRadius = owner.getResources().getDimension(R.dimen.nj_radius_panel);
+        android.graphics.drawable.GradientDrawable clipBg = new android.graphics.drawable.GradientDrawable();
+        clipBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        clipBg.setColor(android.graphics.Color.TRANSPARENT);
+        clipBg.setCornerRadius(cornerRadius);
+        w.setBackgroundDrawable(clipBg);
         listener = onSwitch == null ? null : onSwitch::accept;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // The window keeps its radius on its decor view, which exists only once asked for.
-            w.getDecorView();
+            w.getDecorView().setClipToOutline(true);
             setRadius(riseMs > 0 ? 1 : radius);
             if (listener != null) manager.addCrossWindowBlurEnabledListener(listener);
         }
         window.show();
+    }
+
+    /** Clips this blur window's SurfaceFlinger blur strictly to the given 8 corner radii (e.g. top-only for bottom sheets). */
+    void setCornerRadii(float[] radii) {
+        if (closed || radii == null || radii.length != 8) return;
+        Window w = window.getWindow();
+        if (w == null) return;
+        cornerRadius = radii[0];
+        bottomSquare = radii[4] <= 0f;
+        android.graphics.drawable.GradientDrawable clipBg = new android.graphics.drawable.GradientDrawable();
+        clipBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        clipBg.setColor(android.graphics.Color.TRANSPARENT);
+        // SurfaceFlinger only extracts a rounded clip outline from a uniform corner radius.
+        // When the bottom edge is square (bottom sheet), extend the blur window past the bottom edge in cover().
+        clipBg.setCornerRadius(cornerRadius);
+        w.setBackgroundDrawable(clipBg);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            w.getDecorView().setClipToOutline(true);
+        }
     }
 
     private void setRadius(int value) {
@@ -111,13 +138,14 @@ final class MenuBlurWindow {
     /** Lies behind the panel at these screen pixels; a new page moves it with the panel's height. */
     void cover(int x, int y, int width, int height) {
         if (closed || width <= 0 || height <= 0) return;
+        int targetHeight = height + (bottomSquare ? Math.round(cornerRadius) : 0);
         Window w = window.getWindow();
         WindowManager.LayoutParams params = w.getAttributes();
-        if (params.x == x && params.y == y && params.width == width && params.height == height) return;
+        if (params.x == x && params.y == y && params.width == width && params.height == targetHeight) return;
         params.x = x;
         params.y = y;
         params.width = width;
-        params.height = height;
+        params.height = targetHeight;
         w.setAttributes(params);
         if (!placed) {
             placed = true;

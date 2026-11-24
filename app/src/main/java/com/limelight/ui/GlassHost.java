@@ -76,9 +76,29 @@ public class GlassHost extends FrameLayout {
                 && AppThemePalette.isLiveBlurEffective(getContext());
     }
 
+    private android.graphics.drawable.Drawable portalSyncListener;
+
+    /** Keeps GlassHost's RenderNode blur synced as PortalShaderView renders behind child 0. */
+    public void attachPortalSync(PortalShaderView psv) {
+        if (psv == null || portalSyncListener != null) return;
+        portalSyncListener = new android.graphics.drawable.Drawable() {
+            @Override public void draw(Canvas canvas) { }
+            @Override public void setAlpha(int alpha) { }
+            @Override public void setColorFilter(android.graphics.ColorFilter cf) { }
+            @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
+            @Override public void invalidateSelf() {
+                if (isLive()) {
+                    GlassHost.this.postInvalidateOnAnimation();
+                    for (GlassSurface surface : surfaces) surface.postInvalidateOnAnimation();
+                }
+            }
+        };
+        psv.registerFrostedDrawable(portalSyncListener);
+    }
+
     /** Reloads GlassSpec and invalidates all child GlassSurfaces after Theme Studio changes. */
     public void refreshGlass() {
-        if (!isLive() && live != null) live = null;
+        live = null;
         for (GlassSurface surface : surfaces) surface.onTierChanged();
         invalidate();
     }
@@ -261,9 +281,16 @@ public class GlassHost extends FrameLayout {
             if (node != null) return node;
             node = new RenderNode("glass-blur");
             float sigma = spec.blur / SCALE;
-            node.setRenderEffect(RenderEffect.createChainEffect(
-                    RenderEffect.createColorFilterEffect(new ColorMatrixColorFilter(glassMatrix(spec.saturate, spec.brightness))),
-                    RenderEffect.createBlurEffect(radiusForSigma(sigma), radiusForSigma(sigma), Shader.TileMode.CLAMP)));
+            RenderEffect colorEffect = RenderEffect.createColorFilterEffect(
+                    new ColorMatrixColorFilter(glassMatrix(spec.saturate, spec.brightness)));
+            if (sigma > 0.25f) {
+                float r = radiusForSigma(sigma);
+                node.setRenderEffect(RenderEffect.createChainEffect(
+                        colorEffect,
+                        RenderEffect.createBlurEffect(r, r, Shader.TileMode.CLAMP)));
+            } else {
+                node.setRenderEffect(colorEffect);
+            }
             blurs.put(spec, node);
             record(node);
             return node;

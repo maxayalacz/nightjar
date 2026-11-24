@@ -160,12 +160,19 @@ public final class ShellBar {
             int[][] states = new int[][] { new int[] { android.R.attr.state_selected }, new int[] {} };
             android.content.res.ColorStateList colorState = new android.content.res.ColorStateList(
                     states, new int[] { palette.highlight, palette.getSecondaryTextColor() });
+            android.content.res.ColorStateList rippleState = android.content.res.ColorStateList.valueOf(
+                    (0x38 << 24) | (palette.accent & 0x00FFFFFF));
+            android.content.res.ColorStateList strokeState = new android.content.res.ColorStateList(
+                    new int[][] { new int[] { android.R.attr.state_focused }, new int[] {} },
+                    new int[] { palette.highlight, android.graphics.Color.TRANSPARENT });
             for (int i = 0; i < items.getChildCount(); i++) {
                 View child = items.getChildAt(i);
                 if (child instanceof MaterialButton) {
                     MaterialButton mb = (MaterialButton) child;
                     mb.setTextColor(colorState);
                     mb.setIconTint(colorState);
+                    mb.setRippleColor(rippleState);
+                    mb.setStrokeColor(strokeState);
                 }
             }
         }

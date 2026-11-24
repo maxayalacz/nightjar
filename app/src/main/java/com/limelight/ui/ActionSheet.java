@@ -140,18 +140,19 @@ public final class ActionSheet extends BottomSheetDialog {
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(edge - spacing, 0, edge - spacing, panel ? spacing / 2 : spacing * 2);
         if (television) content.setClipToPadding(false);
+        AppThemePalette palette = AppThemePalette.getCurrent(context);
         heading = new TextView(context);
         // A panel's title is the game's name over a compact grid: a size down from a sheet's, on one line.
         heading.setTextAppearance(context, panel ? R.style.TextAppearance_Nightjar_StreamMenuTitle : R.style.TextAppearance_Nightjar_ScreenTitle);
         heading.setText(title);
         heading.setMaxLines(panel ? 1 : 2);
         heading.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        heading.setTextColor(MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurface, 0));
+        heading.setTextColor(palette.getPrimaryTextColor());
         heading.setPadding(0, panel ? 0 : spacing, spacing, panel ? 0 : spacing);
         ViewCompat.setAccessibilityHeading(heading, true);
         subtitle = new TextView(context);
         subtitle.setTextAppearance(context, R.style.TextAppearance_Nightjar_Supporting);
-        subtitle.setTextColor(MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurfaceVariant, 0));
+        subtitle.setTextColor(palette.getSecondaryTextColor());
         subtitle.setSingleLine(true);
         subtitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
         subtitle.setPadding(0, panel ? spacing / 4 : 0, spacing, panel ? 0 : spacing);
@@ -160,8 +161,7 @@ public final class ActionSheet extends BottomSheetDialog {
         back = new androidx.appcompat.widget.AppCompatImageButton(context, null, 0);
         back.setId(R.id.action_sheet_back);
         back.setImageResource(R.drawable.ic_arrow_back);
-        back.setImageTintList(android.content.res.ColorStateList.valueOf(
-                MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurfaceVariant, 0)));
+        back.setImageTintList(android.content.res.ColorStateList.valueOf(palette.getSecondaryTextColor()));
         back.setPadding(spacing * 3 / 2, spacing * 3 / 2, spacing * 3 / 2, spacing * 3 / 2);
         back.setBackgroundResource(R.drawable.bg_icon_button);
         back.setContentDescription(context.getString(R.string.sheet_back));
@@ -201,8 +201,7 @@ public final class ActionSheet extends BottomSheetDialog {
         ImageButton close = new androidx.appcompat.widget.AppCompatImageButton(context, null, 0);
         close.setId(R.id.action_sheet_close);
         close.setImageResource(R.drawable.ic_close);
-        close.setImageTintList(android.content.res.ColorStateList.valueOf(
-                MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurfaceVariant, 0)));
+        close.setImageTintList(android.content.res.ColorStateList.valueOf(palette.getSecondaryTextColor()));
         close.setPadding(spacing * 3 / 2, spacing * 3 / 2, spacing * 3 / 2, spacing * 3 / 2);
         // The same round focus ring as the other icon buttons instead of a grey square.
         close.setBackgroundResource(R.drawable.bg_icon_button);
@@ -219,8 +218,7 @@ public final class ActionSheet extends BottomSheetDialog {
             panelClose.setIconGravity(MaterialButton.ICON_GRAVITY_TEXT_START);
             panelClose.setIconPadding(0);
             panelClose.setIconSize(spacing * 5 / 2);
-            panelClose.setIconTint(android.content.res.ColorStateList.valueOf(
-                    MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurface, 0)));
+            panelClose.setIconTint(android.content.res.ColorStateList.valueOf(palette.getPrimaryTextColor()));
             panelClose.setInsetTop(0);
             panelClose.setInsetBottom(0);
             panelClose.setMinWidth(0);
@@ -336,27 +334,38 @@ public final class ActionSheet extends BottomSheetDialog {
         return menuGlass;
     }
 
+    private GlassPanelDrawable sheetGlass;
+    private android.view.View blurTarget;
+    private final android.view.ViewTreeObserver.OnPreDrawListener blurTracker = () -> {
+        placeBlur();
+        return true;
+    };
+
     @Override
     public void show() {
-        // A stream that is finishing refuses a new window: the panel and its blur must not be created over it.
         android.app.Activity owner = getOwnerActivity();
         if (owner != null && (owner.isFinishing() || owner.isDestroyed())) {
             return;
         }
-        // Shown first, so it stands under the panel: it blurs the stream, not the menu.
-        // A panel over a page samples nothing live: its surface stays the near-opaque one, over the page's dim.
-        if (panel && anchor == null && blur == null && !isShowing() && owner != null) {
+        if (blur == null && !isShowing() && owner != null && !PortalBackgroundHelper.isRobolectric()) {
             int radius = Math.round(GlassSpec.menuWindow(getContext()).blur);
-            blur = MenuBlurWindow.openIfAllowed(owner, radius, on -> menuGlass.setOverBlur(on));
-            menuGlass.setOverBlur(blur != null);
+            blur = MenuBlurWindow.openIfAllowed(owner, radius, on -> {
+                if (menuGlass != null) menuGlass.setOverBlur(on);
+                if (sheetGlass != null) sheetGlass.setOverCrossWindowBlur(on);
+            });
+            if (menuGlass != null) menuGlass.setOverBlur(blur != null);
             if (blur != null) {
-                body.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> placeBlur());
+                float r = getContext().getResources().getDimension(R.dimen.nj_radius_panel);
+                if (!panel && !television) {
+                    blur.setCornerRadii(new float[] { r, r, r, r, 0f, 0f, 0f, 0f });
+                } else {
+                    blur.setCornerRadii(new float[] { r, r, r, r, r, r, r, r });
+                }
             }
         }
         try {
             super.show();
         } catch (RuntimeException e) {
-            // A window this stream no longer takes must not leave its blur behind on its own.
             closeBlur();
             throw e;
         }
@@ -364,7 +373,6 @@ public final class ActionSheet extends BottomSheetDialog {
 
     private void blurPage() {
         if (pageBlurAsked) {
-            // Shown again: battery saver or the system's switch may have changed since.
             if (pageBlur != null) pageBlur.refresh();
             return;
         }
@@ -377,11 +385,24 @@ public final class ActionSheet extends BottomSheetDialog {
         return pageBlur;
     }
 
+    private void attachBlurTarget(android.view.View target) {
+        if (blur == null || target == null) return;
+        if (blurTarget != null && blurTarget != target && blurTarget.getViewTreeObserver().isAlive()) {
+            blurTarget.getViewTreeObserver().removeOnPreDrawListener(blurTracker);
+        }
+        blurTarget = target;
+        target.getViewTreeObserver().addOnPreDrawListener(blurTracker);
+        target.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> placeBlur());
+        placeBlur();
+    }
+
     private void placeBlur() {
         if (blur == null) return;
+        android.view.View target = blurTarget != null ? blurTarget : body;
+        if (target == null || target.getWidth() <= 0 || target.getHeight() <= 0) return;
         int[] at = new int[2];
-        body.getLocationOnScreen(at);
-        blur.cover(at[0], at[1], body.getWidth(), body.getHeight());
+        target.getLocationOnScreen(at);
+        blur.cover(at[0], at[1], target.getWidth(), target.getHeight());
     }
 
     /** The sheet's title, for a page shown in place of the first one. */
@@ -1168,8 +1189,8 @@ public final class ActionSheet extends BottomSheetDialog {
         text.append(note);
         text.setSpan(new android.text.style.TextAppearanceSpan(getContext(), R.style.TextAppearance_Nightjar_Supporting),
                 start, text.length(), 0);
-        text.setSpan(new android.text.style.ForegroundColorSpan(MaterialColors.getColor(getContext(),
-                com.google.android.material.R.attr.colorOnSurfaceVariant, 0)), start, text.length(), 0);
+        text.setSpan(new android.text.style.ForegroundColorSpan(
+                AppThemePalette.getCurrent(getContext()).getSecondaryTextColor()), start, text.length(), 0);
         return text;
     }
 
@@ -1183,10 +1204,17 @@ public final class ActionSheet extends BottomSheetDialog {
     }
 
     private MaterialButton addAction(android.view.ViewGroup parent, int icon, CharSequence label, int textColor, int iconColor) {
+        AppThemePalette palette = AppThemePalette.getCurrent(getContext());
+        int resolvedText = textColor == com.google.android.material.R.attr.colorOnSurface
+                ? palette.getPrimaryTextColor()
+                : MaterialColors.getColor(getContext(), textColor, 0);
+        int resolvedIcon = iconColor == com.google.android.material.R.attr.colorOnSurfaceVariant
+                ? palette.getSecondaryTextColor()
+                : MaterialColors.getColor(getContext(), iconColor, 0);
         MaterialButton button = new MaterialButton(getContext(), null, androidx.appcompat.R.attr.borderlessButtonStyle);
         button.setText(label);
         button.setTextAppearance(getContext(), R.style.TextAppearance_Nightjar_Body);
-        button.setTextColor(MaterialColors.getColor(getContext(), textColor, 0));
+        button.setTextColor(resolvedText);
         button.setAllCaps(false);
         button.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         button.setMinHeight(spacing * 7);
@@ -1194,7 +1222,7 @@ public final class ActionSheet extends BottomSheetDialog {
         button.setSingleLine(false);
         button.setPaddingRelative(spacing, spacing, spacing, spacing);
         button.setIconResource(icon);
-        button.setIconTint(android.content.res.ColorStateList.valueOf(MaterialColors.getColor(getContext(), iconColor, 0)));
+        button.setIconTint(android.content.res.ColorStateList.valueOf(resolvedIcon));
         button.setIconPadding(spacing * 2);
         button.setIconSize(spacing * 3);
         parent.addView(button, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
@@ -1255,11 +1283,14 @@ public final class ActionSheet extends BottomSheetDialog {
             floatOnTelevision(sheet);
         } else if (sheet != null) {
             GlassPanelDrawable glass = GlassPanelDrawable.sheet(getContext());
+            sheetGlass = glass;
+            glass.setOverCrossWindowBlur(blur != null);
             sheet.setBackground(glass);
             // Material installs its surface during the first layout, replacing any other.
             sheet.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
                 if (view.getBackground() != glass) view.setBackground(glass);
             });
+            attachBlurTarget(sheet);
         }
         if (getWindow() != null) getWindow().setDimAmount(GlassPanelDrawable.backdropDim(getContext()));
         if (!content.isInTouchMode() && firstAction != null) firstAction.requestFocus();
@@ -1328,8 +1359,12 @@ public final class ActionSheet extends BottomSheetDialog {
         if (body.getLayoutParams() instanceof android.view.ViewGroup.MarginLayoutParams) {
             ((android.view.ViewGroup.MarginLayoutParams) body.getLayoutParams()).bottomMargin = gap;
         }
-        body.setBackground(GlassPanelDrawable.dialog(getContext()));
+        GlassPanelDrawable dialogGlass = GlassPanelDrawable.dialog(getContext());
+        sheetGlass = dialogGlass;
+        dialogGlass.setOverCrossWindowBlur(blur != null);
+        body.setBackground(dialogGlass);
         body.setClipToOutline(true);
+        attachBlurTarget(body);
         scroll.setVerticalFadingEdgeEnabled(true);
         scroll.setFadingEdgeLength(spacing * 3);
         sheet.requestLayout();
@@ -1359,6 +1394,7 @@ public final class ActionSheet extends BottomSheetDialog {
             });
             sheet.requestLayout();
         }
+        attachBlurTarget(body);
         if (!content.isInTouchMode() && firstAction != null) firstAction.requestFocus();
     }
 
@@ -1369,11 +1405,18 @@ public final class ActionSheet extends BottomSheetDialog {
 
     /** Removes the blur under the panel, if this sheet opened one, and returns the glass to its opaque surface. */
     private void closeBlur() {
+        if (blurTarget != null) {
+            if (blurTarget.getViewTreeObserver().isAlive()) {
+                blurTarget.getViewTreeObserver().removeOnPreDrawListener(blurTracker);
+            }
+            blurTarget = null;
+        }
         if (blur == null) return;
         MenuBlurWindow open = blur;
         blur = null;
         open.close();
         if (menuGlass != null) menuGlass.setOverBlur(false);
+        if (sheetGlass != null) sheetGlass.setOverCrossWindowBlur(false);
     }
 
     @Override

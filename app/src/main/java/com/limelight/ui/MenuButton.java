@@ -111,16 +111,18 @@ public final class MenuButton extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
+        AppThemePalette palette = AppThemePalette.getCurrent(getContext());
         float size = Math.min(getWidth(), getHeight()), r = size / 2;
         float stroke = 1.5f * density;
-        fill.setColor(isPressed() ? 0xB3000000 : 0x8C000000);
+        int baseFill = palette.getFrostedCardTint(0x8C121826);
+        fill.setColor(isPressed() ? ((0xCC << 24) | (palette.accent & 0x00FFFFFF)) : baseFill);
         canvas.drawCircle(r, r, r - stroke / 2, fill);
         ink.setStrokeWidth(stroke);
-        ink.setColor(0x66FFFFFF);
+        ink.setColor(palette.getCardRimColor());
         canvas.drawCircle(r, r, r - stroke / 2, ink);
         // Three lines, the menu's sign.
         ink.setStrokeWidth(2 * density);
-        ink.setColor(0xF2FFFFFF);
+        ink.setColor(palette.getPrimaryTextColor());
         float half = size * .18f, gap = size * .13f;
         for (int line = -1; line <= 1; line++) canvas.drawLine(r - half, r + line * gap, r + half, r + line * gap, ink);
     }

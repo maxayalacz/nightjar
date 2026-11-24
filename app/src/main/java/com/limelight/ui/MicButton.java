@@ -159,12 +159,13 @@ public final class MicButton extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
+        AppThemePalette palette = AppThemePalette.getCurrent(getContext());
         float size = Math.min(getWidth(), getHeight()), r = size / 2;
         float stroke = (shownMuted ? 1.5f : 2f) * density;
-        fill.setColor(shownMuted ? (mutedFill & 0x00FFFFFF) | 0xE6000000 : 0x8C000000);
+        fill.setColor(shownMuted ? (mutedFill & 0x00FFFFFF) | 0xE6000000 : palette.getFrostedCardTint(0x8C121826));
         canvas.drawCircle(r, r, r - stroke / 2, fill);
         rim.setStrokeWidth(stroke);
-        rim.setColor(shownMuted ? 0x66FFFFFF : accent);
+        rim.setColor(shownMuted ? palette.getCardRimColor() : palette.accent);
         canvas.drawCircle(r, r, r - stroke / 2, rim);
         Drawable icon = shownMuted ? muted : live;
         int inset = Math.round(size * .25f);

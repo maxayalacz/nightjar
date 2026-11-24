@@ -132,9 +132,15 @@ public final class GlassPanelDrawable extends Drawable {
     }
 
     private void useMenuRecipe(boolean overBlur) {
-        spec = AppTheme.isHighContrast(menuContext) ? GlassSpec.of(menuContext, "menu", GlassTier.SOLID, false)
+        boolean hc = AppTheme.isHighContrast(menuContext);
+        spec = hc ? GlassSpec.of(menuContext, "menu", GlassTier.SOLID, false)
                 : overBlur ? GlassSpec.menuWindow(menuContext) : GlassSpec.of(menuContext, "menu", GlassTier.BAKED, false);
-        setFill(spec.fill);
+        if (hc) {
+            setFill(spec.fill);
+        } else {
+            AppThemePalette palette = AppThemePalette.getCurrent(menuContext);
+            setFill(palette.getDialogSurfaceColor(overBlur || AppThemePalette.isLiveBlurEffective(menuContext)));
+        }
         rim.setStrokeWidth(spec.rimWidth);
     }
 
@@ -190,7 +196,21 @@ public final class GlassPanelDrawable extends Drawable {
     }
 
     private Context panelContext;
+    private boolean overCrossWindowBlur;
     private final Paint blurPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
+    private boolean portalTickRegistered;
+
+    /** Marks whether a live MenuBlurWindow is active behind this panel so fill uses frosted alpha. */
+    void setOverCrossWindowBlur(boolean active) {
+        if (overCrossWindowBlur == active) return;
+        overCrossWindowBlur = active;
+        Context ctx = panelContext != null ? panelContext : menuContext;
+        if (ctx != null) {
+            AppThemePalette palette = AppThemePalette.getCurrent(ctx);
+            fill.setColor(palette.getDialogSurfaceColor(active || AppThemePalette.isLiveBlurEffective(ctx)));
+        }
+        invalidateSelf();
+    }
 
     @Override
     protected void onBoundsChange(Rect bounds) {
@@ -208,10 +228,15 @@ public final class GlassPanelDrawable extends Drawable {
     @Override
     public void draw(Canvas canvas) {
         Context ctx = panelContext != null ? panelContext : menuContext;
-        if (!overStream && ctx != null && AppThemePalette.isLiveBlurEffective(ctx) && !PortalBackgroundHelper.isRobolectric()) {
+        if (!overStream && !overCrossWindowBlur && ctx != null
+                && AppThemePalette.isLiveBlurEffective(ctx) && !PortalBackgroundHelper.isRobolectric()) {
             android.app.Activity act = PortalBackgroundHelper.activityOf(ctx);
             PortalShaderView psv = PortalBackgroundHelper.getShaderView(act);
             if (psv != null) {
+                if (!portalTickRegistered) {
+                    portalTickRegistered = true;
+                    psv.registerFrostedDrawable(this);
+                }
                 android.graphics.Bitmap bmp = psv.getBlurredBitmap();
                 if (bmp != null && !bmp.isRecycled()) {
                     int satPct = com.limelight.preferences.PreferenceConfiguration

@@ -25,6 +25,11 @@ public class HomeList extends RecyclerView {
     }
 
     @Override
+    protected float getTopFadingEdgeStrength() {
+        return 0f;
+    }
+
+    @Override
     protected float getBottomFadingEdgeStrength() {
         return 0f;
     }

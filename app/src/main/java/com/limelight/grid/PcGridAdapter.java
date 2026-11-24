@@ -287,10 +287,16 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
         if (card) {
             size(parentView.findViewById(R.id.grid_card), R.dimen.tile_height);
             MaterialCardView cardView = parentView.findViewById(R.id.grid_card);
-            cardView.setCardBackgroundColor(NightSkyView.groupFill(context));
+            com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(context);
+            cardView.setCardBackgroundColor(palette.getFrostedCardTint(0x52121826));
             if (AppTheme.isHighContrast(context)) {
                 cardView.setStrokeColor(ContextCompat.getColor(context, R.color.nj_hc_color_rim));
                 cardView.setStrokeWidth(context.getResources().getDimensionPixelSize(R.dimen.nj_glass_chrome_solid_rim_width));
+            } else {
+                float outlineScale = Math.max(0f, PreferenceConfiguration.readPreferences(context).cardOutlineThicknessPercent / 100f);
+                int strokePx = outlineScale <= 0f ? 0 : Math.max(1, Math.round(context.getResources().getDisplayMetrics().density * outlineScale));
+                cardView.setStrokeColor(palette.getCardRimColor());
+                cardView.setStrokeWidth(strokePx);
             }
             tiles.show(face, obj.details.uuid, obj.runningGame, state, TileBackdrops.Cut.SCREEN);
         } else {
@@ -388,9 +394,9 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
                 if (actions != null) actions.onResume(obj);
             });
         } else if (word != 0) {
+            com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(context);
             action.setText(word);
-            action.setTextColor(state == RowState.NOT_PAIRED ? NightSkyView.moonInk(context)
-                    : MaterialColors.getColor(action, com.google.android.material.R.attr.colorOnSurface));
+            action.setTextColor(state == RowState.NOT_PAIRED ? palette.accent : palette.getPrimaryTextColor());
             action.setIconResource(state == RowState.OFFLINE ? R.drawable.ic_glass_power : 0);
             action.setOnClickListener(v -> {
                 if (actions != null) actions.onMain(obj);

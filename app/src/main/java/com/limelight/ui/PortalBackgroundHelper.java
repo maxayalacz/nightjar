@@ -156,6 +156,7 @@ public final class PortalBackgroundHelper {
         if (content != null) {
             GlassHost host = findGlassHost(content);
             if (host != null) {
+                host.attachPortalSync(psv);
                 host.refreshGlass();
             }
         }

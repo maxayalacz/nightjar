@@ -522,16 +522,15 @@ public class DesktopControlsPanel extends LinearLayout {
 
     private void selected(MaterialButton button, boolean selected) {
         button.setSelected(selected);
+        AppThemePalette palette = AppThemePalette.getCurrent(getContext());
         if (button.getBackground() instanceof GlassControlDrawable) {
             // A key's own drawable shows it selected.
-            button.setTextColor(selected ? MaterialColors.getColor(StreamGlass.themed(getContext()), R.attr.glassOnSelected, 0)
-                    : ContextCompat.getColor(getContext(), AppTheme.isHighContrast(getContext()) ? R.color.nj_hc_color_label : R.color.nj_color_label));
+            button.setTextColor(selected ? palette.highlight : palette.getPrimaryTextColor());
             return;
         }
         button.setBackgroundTintList(ColorStateList.valueOf(selected ?
-                color(com.google.android.material.R.attr.colorPrimaryContainer) : Color.TRANSPARENT));
-        button.setTextColor(color(selected ? com.google.android.material.R.attr.colorOnPrimaryContainer :
-                com.google.android.material.R.attr.colorOnSurface));
+                ((0x44 << 24) | (palette.accent & 0x00FFFFFF)) : Color.TRANSPARENT));
+        button.setTextColor(selected ? palette.highlight : palette.getPrimaryTextColor());
     }
 
     private LinearLayout createPad() {

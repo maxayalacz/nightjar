@@ -293,7 +293,14 @@ public class GlassSurface extends FrameLayout {
 
     private void drawBack(Canvas canvas) {
         if (tier == GlassTier.SOLID) return;
-        // Primary path: sample PortalShaderView's live blurred starfield bitmap directly inside the rounded clip
+        // Primary path on API 31+: use GlassHost's full-content RenderNode blur so scrolling app/PC/settings
+        // cards AND the animated starfield behind floating pills all appear live in the blur.
+        if (host != null && host.isLive()
+                && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && canvas.isHardwareAccelerated()) {
+            drawLive(canvas);
+            return;
+        }
+        // Fallback path (API < 31 or BAKED tier): sample PortalShaderView's live blurred starfield bitmap.
         if (AppThemePalette.isLiveBlurEffective(getContext()) && !PortalBackgroundHelper.isRobolectric()) {
             android.app.Activity act = PortalBackgroundHelper.activityOf(getContext());
             PortalShaderView psv = PortalBackgroundHelper.getShaderView(act);
@@ -326,10 +333,6 @@ public class GlassSurface extends FrameLayout {
             canvas.clipPath(shape);
             host.drawBaked(canvas, atX, atY, getWidth(), getHeight(), bakedPaint);
             canvas.restore();
-            return;
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && canvas.isHardwareAccelerated()) {
-            drawLive(canvas);
         }
     }
 

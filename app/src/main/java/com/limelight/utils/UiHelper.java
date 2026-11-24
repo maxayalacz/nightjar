@@ -327,29 +327,98 @@ public class UiHelper {
         }
     }
 
+    public static android.graphics.drawable.GradientDrawable createDialogSquircleDrawable(
+            Context context, boolean blurred, float[] cornerRadiiPx) {
+        com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(context);
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        if (cornerRadiiPx != null && cornerRadiiPx.length == 8) {
+            bg.setCornerRadii(cornerRadiiPx);
+        } else {
+            bg.setCornerRadius(dpToPx(context, 28f));
+        }
+        bg.setColor(palette.getDialogSurfaceColor(blurred));
+        int strokePx = Math.round(getCardOutlineWidthPx(context, 1.15f));
+        if (strokePx > 0) {
+            bg.setStroke(strokePx, palette.getCardRimColor());
+        }
+        return bg;
+    }
+
     public static void styleDialogSquircle(android.app.Dialog dialog) {
         if (dialog == null || dialog.getWindow() == null) return;
         Context context = dialog.getContext();
-        com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(context);
-        boolean blurEffective = com.limelight.ui.AppThemePalette.isLiveBlurEffective(context);
-        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-        bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-        bg.setCornerRadius(dpToPx(context, 28f));
-        bg.setColor(palette.getDialogSurfaceColor(blurEffective));
-        float outlineScale = Math.max(0f, PreferenceConfiguration.readPreferences(context).cardOutlineThicknessPercent / 100f);
-        int strokePx = outlineScale <= 0f ? 0 : Math.max(1, Math.round(dpToPx(context, 1.25f) * outlineScale));
-        if (strokePx > 0) bg.setStroke(strokePx, palette.cardOutline);
         android.view.Window window = dialog.getWindow();
-        window.setBackgroundDrawable(bg);
+        window.setFormat(android.graphics.PixelFormat.TRANSLUCENT);
+        window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND);
+
+        View decorView = window.getDecorView();
+        decorView.setClipToOutline(true);
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            int blurPct = blurEffective
-                    ? Math.max(0, Math.min(2000, PreferenceConfiguration.readPreferences(context).blurAmountPercent))
-                    : 0;
-            int blurRadiusPx = blurPct <= 0 ? 0
-                    : Math.max(1, Math.round(dpToPx(context, Math.min(64f, 28f * (blurPct / 100f)))));
+            applyBoundedWindowBlur(window, context, null);
+        } else {
+            window.setBackgroundDrawable(createDialogSquircleDrawable(context, false, null));
+        }
+        clearOpaquePanelBackgrounds(decorView);
+    }
+
+    @androidx.annotation.RequiresApi(api = Build.VERSION_CODES.S)
+    private static void applyBoundedWindowBlur(android.view.Window window, Context context, float[] cornerRadiiPx) {
+        WindowManager wm = context.getSystemService(WindowManager.class);
+        boolean blurEffective = com.limelight.ui.AppThemePalette.isLiveBlurEffective(context);
+        int blurPct = blurEffective
+                ? Math.max(0, Math.min(2000, PreferenceConfiguration.readPreferences(context).blurAmountPercent))
+                : 0;
+        final int blurRadiusPx = blurPct <= 0 ? 0
+                : Math.max(1, Math.round(dpToPx(context, Math.min(64f, 28f * (blurPct / 100f)))));
+        final java.util.function.Consumer<Boolean> updateBlur = enabled -> {
+            boolean useBlurred = enabled && blurRadiusPx > 0;
+            window.setBackgroundDrawable(createDialogSquircleDrawable(context, useBlurred, cornerRadiiPx));
             try {
-                window.setBackgroundBlurRadius(blurRadiusPx);
+                window.setBackgroundBlurRadius(useBlurred ? blurRadiusPx : 0);
             } catch (Throwable ignored) {
+            }
+        };
+
+        boolean blurEnabled = wm != null && wm.isCrossWindowBlurEnabled();
+        updateBlur.accept(blurEnabled);
+
+        View decorView = window.getDecorView();
+        if (wm == null || Boolean.TRUE.equals(decorView.getTag(0x7F0A1201))) {
+            return;
+        }
+        decorView.setTag(0x7F0A1201, Boolean.TRUE);
+        decorView.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+            @Override
+            public void onViewAttachedToWindow(View v) {
+                wm.addCrossWindowBlurEnabledListener(updateBlur);
+            }
+
+            @Override
+            public void onViewDetachedFromWindow(View v) {
+                wm.removeCrossWindowBlurEnabledListener(updateBlur);
+            }
+        });
+        if (decorView.isAttachedToWindow()) {
+            wm.addCrossWindowBlurEnabledListener(updateBlur);
+        }
+    }
+
+    private static void clearOpaquePanelBackgrounds(View view) {
+        if (view == null) return;
+        int id = view.getId();
+        if (id == androidx.appcompat.R.id.parentPanel
+                || id == androidx.appcompat.R.id.topPanel
+                || id == androidx.appcompat.R.id.contentPanel
+                || id == androidx.appcompat.R.id.customPanel
+                || id == androidx.appcompat.R.id.buttonPanel) {
+            view.setBackgroundColor(Color.TRANSPARENT);
+        }
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup vg = (android.view.ViewGroup) view;
+            for (int i = 0; i < vg.getChildCount(); i++) {
+                clearOpaquePanelBackgrounds(vg.getChildAt(i));
             }
         }
     }

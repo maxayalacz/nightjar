@@ -378,10 +378,8 @@ final class HomeChrome {
                 : bottom + res.getDimensionPixelSize(R.dimen.nj_size_tab_bar_height) + 3 * res.getDimensionPixelSize(R.dimen.space_m);
         list.setPadding(left + listInset, listTop, right + listInset, foot);
         fitSetupCard();
-        // Scrolled, the list fades out under the top row: a bright button never slides whole under the PC capsule.
         if (list instanceof HomeList) {
-            list.setVerticalFadingEdgeEnabled(true);
-            list.setFadingEdgeLength(rowTop + capsule + gap);
+            list.setVerticalFadingEdgeEnabled(false);
         }
         View fade = activity.findViewById(R.id.home_foot_fade);
         if (fade != null) {

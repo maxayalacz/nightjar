@@ -401,10 +401,7 @@ final class GameTouchInput {
         if (enabled) {
             game.showOnscreenController();
         } else {
-            if (game.modernController != null) {
-                game.modernController.finishEditing(false);
-                game.modernController.hide();
-            }
+            game.hideOnscreenControllers();
         }
         // The microphone button's default place follows the on-screen controller's top row.
         if (game.micButton != null) game.micButton.place();
@@ -444,6 +441,20 @@ final class GameTouchInput {
     }
 
     void showControllerLayoutDialog() {
+        if (game.prefConfig == null
+                || !com.limelight.preferences.PreferenceConfiguration.OSC_ENGINE_NIGHTJAR.equals(game.prefConfig.oscEngine)) {
+            if (!game.prefConfig.onscreenController) {
+                setOnscreenControlsEnabled(true);
+            } else {
+                game.showOnscreenController();
+            }
+            if (game.moonlightVirtualController != null) {
+                game.moonlightVirtualController.setConfigureButtonVisible(true);
+                game.moonlightVirtualController.setControllerMode(
+                        com.limelight.binding.input.virtual_controller.VirtualController.ControllerMode.MoveButtons);
+            }
+            return;
+        }
         // A connected gamepad may have kept the controls off the screen; their layout is still editable.
         game.ensureOnscreenControllers();
         // The controller edits in place: drag, pinch and the panel.
