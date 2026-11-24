@@ -134,14 +134,38 @@ public final class PortalBackgroundHelper {
 
         applyBackdropAndTheme(activity, content, shaderView);
 
+        boolean recreated = (activity instanceof NightjarActivity)
+                && ((NightjarActivity) activity).isRecreatedFromState();
         if (!sColdBootAnimPlayed) {
             sColdBootAnimPlayed = true;
             playColdBootSpiral(activity, shaderView, getForegroundRoot(content, shaderView, handoffView));
+        } else if (recreated) {
+            forceForegroundVisible(activity);
         } else {
             animateForegroundEnter(activity, false);
         }
 
         return shaderView;
+    }
+
+    /** Called from NightjarActivity.onConfigurationChanged() when rotating without recreating. */
+    public static void onConfigurationChanged(Activity activity) {
+        if (activity == null || isRobolectric()) return;
+        PortalShaderView psv = attach(activity);
+        if (psv != null) {
+            psv.refreshFromPrefs();
+            psv.startRendering();
+        }
+        forceForegroundVisible(activity);
+        OneUiThemeApplier.applyToActivity(activity);
+        ViewGroup content = activity.findViewById(android.R.id.content);
+        if (content != null) {
+            GlassHost host = findGlassHost(content);
+            if (host != null) {
+                host.attachPortalSync(psv);
+                host.refreshGlass();
+            }
+        }
     }
 
     /** Called from NightjarActivity.onResume(). */
@@ -200,6 +224,7 @@ public final class PortalBackgroundHelper {
             UiHelper.disableActivityTransition(from, false);
             return;
         }
+        final GlassHost host = findGlassHost(content);
         java.util.List<View> fgs = collectForegroundViews(content, findShaderView(content), content.findViewWithTag(PORTAL_HANDOFF_TAG));
         if (fgs.isEmpty()) {
             captureHandoff(from);
@@ -218,7 +243,7 @@ public final class PortalBackgroundHelper {
 
         for (int i = 0; i < fgs.size(); i++) {
             final View fg = fgs.get(i);
-            fg.animate().setListener(null).cancel();
+            fg.animate().setListener(null).setUpdateListener(null).cancel();
             if (fg.getWidth() > 0 && fg.getHeight() > 0) {
                 fg.setPivotX(fg.getWidth() * 0.5f);
                 fg.setPivotY(fg.getHeight() * 0.5f);
@@ -228,16 +253,18 @@ public final class PortalBackgroundHelper {
                     .scaleX(1.03f)
                     .scaleY(1.03f)
                     .setDuration(135L)
-                    .setInterpolator(new PathInterpolator(0.4f, 0f, 1f, 1f))
-                    .withLayer();
+                    .setInterpolator(new PathInterpolator(0.4f, 0f, 1f, 1f));
             if (i == 0) {
+                if (host != null) {
+                    anim.setUpdateListener(a -> host.invalidate());
+                }
                 anim.setListener(new AnimatorListenerAdapter() {
                     private boolean canceled = false;
 
                     @Override
                     public void onAnimationCancel(Animator animation) {
                         canceled = true;
-                        anchor.animate().setListener(null);
+                        anchor.animate().setListener(null).setUpdateListener(null);
                         if (Integer.valueOf(gen).equals(anchor.getTag(TAG_ANIM_GEN))) {
                             anchor.setTag(TAG_EXIT_RUNNING, null);
                         }
@@ -245,7 +272,7 @@ public final class PortalBackgroundHelper {
 
                     @Override
                     public void onAnimationEnd(Animator animation) {
-                        anchor.animate().setListener(null);
+                        anchor.animate().setListener(null).setUpdateListener(null);
                         if (Integer.valueOf(gen).equals(anchor.getTag(TAG_ANIM_GEN))) {
                             anchor.setTag(TAG_EXIT_RUNNING, null);
                         }
@@ -274,6 +301,7 @@ public final class PortalBackgroundHelper {
             superFinish.run();
             return;
         }
+        final GlassHost host = findGlassHost(content);
         java.util.List<View> fgs = collectForegroundViews(content, findShaderView(content), content.findViewWithTag(PORTAL_HANDOFF_TAG));
         if (fgs.isEmpty()) {
             captureHandoff(activity);
@@ -292,7 +320,7 @@ public final class PortalBackgroundHelper {
 
         for (int i = 0; i < fgs.size(); i++) {
             final View fg = fgs.get(i);
-            fg.animate().setListener(null).cancel();
+            fg.animate().setListener(null).setUpdateListener(null).cancel();
             if (fg.getWidth() > 0 && fg.getHeight() > 0) {
                 fg.setPivotX(fg.getWidth() * 0.5f);
                 fg.setPivotY(fg.getHeight() * 0.5f);
@@ -302,16 +330,18 @@ public final class PortalBackgroundHelper {
                     .scaleX(0.97f)
                     .scaleY(0.97f)
                     .setDuration(130L)
-                    .setInterpolator(new PathInterpolator(0.4f, 0f, 1f, 1f))
-                    .withLayer();
+                    .setInterpolator(new PathInterpolator(0.4f, 0f, 1f, 1f));
             if (i == 0) {
+                if (host != null) {
+                    anim.setUpdateListener(a -> host.invalidate());
+                }
                 anim.setListener(new AnimatorListenerAdapter() {
                     private boolean canceled = false;
 
                     @Override
                     public void onAnimationCancel(Animator animation) {
                         canceled = true;
-                        anchor.animate().setListener(null);
+                        anchor.animate().setListener(null).setUpdateListener(null);
                         if (Integer.valueOf(gen).equals(anchor.getTag(TAG_ANIM_GEN))) {
                             anchor.setTag(TAG_EXIT_RUNNING, null);
                         }
@@ -319,7 +349,7 @@ public final class PortalBackgroundHelper {
 
                     @Override
                     public void onAnimationEnd(Animator animation) {
-                        anchor.animate().setListener(null);
+                        anchor.animate().setListener(null).setUpdateListener(null);
                         if (Integer.valueOf(gen).equals(anchor.getTag(TAG_ANIM_GEN))) {
                             anchor.setTag(TAG_EXIT_RUNNING, null);
                         }
@@ -335,9 +365,34 @@ public final class PortalBackgroundHelper {
         }
     }
 
+    /** Immediately restores full foreground visibility and scale without fading from 0. */
+    public static void forceForegroundVisible(Activity activity) {
+        if (activity == null) return;
+        ViewGroup content = activity.findViewById(android.R.id.content);
+        if (content == null) return;
+        java.util.List<View> fgs = collectForegroundViews(content, findShaderView(content), content.findViewWithTag(PORTAL_HANDOFF_TAG));
+        for (int i = 0; i < fgs.size(); i++) {
+            View fg = fgs.get(i);
+            fg.animate().setListener(null).setUpdateListener(null).cancel();
+            if (i == 0) {
+                fg.setTag(TAG_ENTER_PLAYED, Boolean.TRUE);
+                fg.setTag(TAG_ENTER_RUNNING, null);
+                fg.setTag(TAG_EXIT_RUNNING, null);
+            }
+            fg.setAlpha(1f);
+            fg.setScaleX(1f);
+            fg.setScaleY(1f);
+        }
+        GlassHost host = findGlassHost(content);
+        if (host != null) {
+            host.refreshGlass();
+        }
+    }
+
     private static void animateForegroundEnter(Activity activity, boolean returning) {
         ViewGroup content = activity.findViewById(android.R.id.content);
         if (content == null) return;
+        final GlassHost host = findGlassHost(content);
         final java.util.List<View> fgs = collectForegroundViews(content, findShaderView(content), content.findViewWithTag(PORTAL_HANDOFF_TAG));
         if (fgs.isEmpty()) return;
         final View anchor = fgs.get(0);
@@ -351,7 +406,7 @@ public final class PortalBackgroundHelper {
 
         float startScale = returning ? 1.025f : 0.975f;
         for (View fg : fgs) {
-            fg.animate().setListener(null).cancel();
+            fg.animate().setListener(null).setUpdateListener(null).cancel();
             fg.setAlpha(0f);
             fg.setScaleX(startScale);
             fg.setScaleY(startScale);
@@ -370,24 +425,28 @@ public final class PortalBackgroundHelper {
                         .scaleX(1f)
                         .scaleY(1f)
                         .setDuration(200L)
-                        .setInterpolator(new PathInterpolator(0.22f, 1f, 0.36f, 1f))
-                        .withLayer();
+                        .setInterpolator(new PathInterpolator(0.22f, 1f, 0.36f, 1f));
                 if (i == 0) {
+                    if (host != null) {
+                        anim.setUpdateListener(a -> host.invalidate());
+                    }
                     anim.setListener(new AnimatorListenerAdapter() {
                         @Override
                         public void onAnimationEnd(Animator animation) {
-                            anchor.animate().setListener(null);
+                            anchor.animate().setListener(null).setUpdateListener(null);
                             if (Integer.valueOf(gen).equals(anchor.getTag(TAG_ANIM_GEN))) {
                                 anchor.setTag(TAG_ENTER_RUNNING, null);
                             }
+                            if (host != null) host.refreshGlass();
                         }
 
                         @Override
                         public void onAnimationCancel(Animator animation) {
-                            anchor.animate().setListener(null);
+                            anchor.animate().setListener(null).setUpdateListener(null);
                             if (Integer.valueOf(gen).equals(anchor.getTag(TAG_ANIM_GEN))) {
                                 anchor.setTag(TAG_ENTER_RUNNING, null);
                             }
+                            if (host != null) host.refreshGlass();
                         }
                     });
                 }
@@ -395,20 +454,15 @@ public final class PortalBackgroundHelper {
             }
         };
 
-        if (anchor.getWidth() > 0 && anchor.getHeight() > 0) {
-            anchor.postOnAnimation(startAnim);
-        } else {
-            anchor.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
-                @Override
-                public boolean onPreDraw() {
-                    if (anchor.getViewTreeObserver().isAlive()) {
-                        anchor.getViewTreeObserver().removeOnPreDrawListener(this);
-                    }
-                    anchor.postOnAnimation(startAnim);
-                    return true;
-                }
-            });
-        }
+        // Fail-safe so foreground UI can never remain stuck invisible if a rotation/layout pass interrupts animation
+        anchor.postDelayed(() -> {
+            if (Integer.valueOf(gen).equals(anchor.getTag(TAG_ANIM_GEN))
+                    && !Boolean.TRUE.equals(anchor.getTag(TAG_EXIT_RUNNING))) {
+                forceForegroundVisible(activity);
+            }
+        }, 320L);
+
+        anchor.post(startAnim);
     }
 
     private static void restoreForegroundIfNeeded(Activity activity) {
@@ -425,7 +479,11 @@ public final class PortalBackgroundHelper {
             return;
         }
         if (anchor.getAlpha() < 0.99f || Math.abs(anchor.getScaleX() - 1f) > 0.005f) {
-            animateForegroundEnter(activity, true);
+            if ((activity instanceof NightjarActivity) && ((NightjarActivity) activity).isRecreatedFromState()) {
+                forceForegroundVisible(activity);
+            } else {
+                animateForegroundEnter(activity, true);
+            }
         }
     }
 

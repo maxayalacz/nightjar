@@ -736,6 +736,8 @@ public class PcView extends NightjarActivity implements AdapterFragmentCallbacks
             // The first PC replaced the empty state, which held focus; give it to the list, not the shell bar.
             claimListFocus();
         }
+        com.limelight.ui.GlassHost gh = findViewById(R.id.glass_host);
+        if (gh != null) gh.refreshGlass();
     }
 
     /**

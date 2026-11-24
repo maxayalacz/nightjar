@@ -45,6 +45,7 @@ public final class ModernController {
     /** The WASD stick's keys, Windows virtual-key codes through the sink's {@code key}. */
     private final WasdKeys.Keys keys;
     private final PadPainter painter;
+    private final PadLiveBlurHelper blurHelper;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Map<PadLayout.Control, PadControlView> views = new EnumMap<>(PadLayout.Control.class);
     /** The press halos past the controls' edges, under every control; null while there are no controls. */
@@ -54,6 +55,7 @@ public final class ModernController {
     private PadLayout layout;
     private boolean perGame, shown = true, landscape;
     private PadEditor editor;
+    private Runnable onEditorClosed;
     private final float[] box = new float[4];
     private TouchSink touchSink;
     private PointerSink pointerSink;
@@ -87,6 +89,7 @@ public final class ModernController {
         this.gamepad = new LayoutGamepad(sink);
         this.keys = sink::key;
         this.painter = new PadPainter(context);
+        this.blurHelper = new PadLiveBlurHelper(this, context);
         this.landscape = landscape();
         resend = gamepad::resend;
         resize = (v, l, t, r, b, ol, ot, or, ob) -> {
@@ -149,6 +152,7 @@ public final class ModernController {
         releaseInput();
         removeElements();
         load();
+        painter.refreshTheme();
         painter.setGlyph(layout.glyph());
         painter.setFacesSwapped(layout.facesSwapped());
         // The acceleration curve and the Trackpad speed reach the pointer touchpad's motion model, here and in
@@ -164,6 +168,7 @@ public final class ModernController {
             }
             PadControlView view = new PadControlView(context, control, painter, gamepad, this::changed, keys);
             view.setHaloLayer(halo);
+            view.setBlurHelper(blurHelper);
             view.configureStick(prefs.oscFloatingSticks, prefs.oscStickDeadzone / 100f);
             view.setHaptics(prefs.vibrateOsc);
             view.setStickTouch(prefs.oscSteamControls);
@@ -189,6 +194,9 @@ public final class ModernController {
         }
         frame.addOnLayoutChangeListener(resize);
         place();
+        if (shown || editor != null) {
+            blurHelper.start();
+        }
     }
 
     /** Puts every control where the layout says on the frame's current size. */
@@ -231,7 +239,9 @@ public final class ModernController {
 
     public void show() {
         shown = true;
+        painter.refreshTheme();
         place();
+        blurHelper.start();
         // What sits below the top row (the microphone button) follows the controls back, as when they hide.
         if (onLayoutChanged != null) onLayoutChanged.run();
     }
@@ -240,6 +250,46 @@ public final class ModernController {
         shown = false;
         releaseInput();
         place();
+        if (editor == null) {
+            blurHelper.stop();
+        }
+    }
+
+    /** Updates live opacity, outline thickness, haptics, and theme colors without rebuilding views. */
+    public void refreshLiveVisuals() {
+        painter.refreshTheme();
+        for (Map.Entry<PadLayout.Control, PadControlView> entry : views.entrySet()) {
+            PadControlView view = entry.getValue();
+            view.setHaptics(prefs.vibrateOsc);
+            view.configureStick(prefs.oscFloatingSticks, prefs.oscStickDeadzone / 100f);
+            view.setRestingAlpha(prefs.oscOpacity / 100f * layout.spec(entry.getKey()).opacity / 100f);
+            view.invalidate();
+            if (view.knobLayer() != null) view.knobLayer().invalidate();
+        }
+        if (editor != null) {
+            editor.invalidateBlurTargets();
+        }
+    }
+
+    public void refreshLiveBlurPreferences() {
+        painter.refreshTheme();
+        blurHelper.refreshBlurPreferenceNow();
+        invalidateBlurTargets();
+    }
+
+    PadLiveBlurHelper blurHelper() {
+        return blurHelper;
+    }
+
+    void invalidateBlurTargets() {
+        for (PadControlView view : views.values()) {
+            if (view.getVisibility() == View.VISIBLE) {
+                view.invalidate();
+            }
+        }
+        if (editor != null) {
+            editor.invalidateBlurTargets();
+        }
     }
 
     /**
@@ -261,6 +311,7 @@ public final class ModernController {
 
     /** Redraws the controls after the glyphs or the pointer touchpad's mode changed. */
     private void applyAppearance() {
+        painter.refreshTheme();
         painter.setGlyph(layout.glyph());
         painter.setFacesSwapped(layout.facesSwapped());
         String curve = prefs.trackpadAcceleration ? prefs.trackpadAccelerationCurve : PointerAcceleration.LINEAR;
@@ -270,6 +321,7 @@ public final class ModernController {
                 view.configurePointer(layout.pointerMode() == PadLayout.PointerMode.CAMERA, curve, prefs.trackpadSpeed);
             }
             view.invalidate();
+            if (view.knobLayer() != null) view.knobLayer().invalidate();
         }
     }
 
@@ -280,6 +332,9 @@ public final class ModernController {
     }
 
     public void removeElements() {
+        if (editor == null) {
+            blurHelper.stop();
+        }
         frame.removeOnLayoutChangeListener(resize);
         for (PadControlView view : views.values()) {
             frame.removeView(view);
@@ -293,6 +348,7 @@ public final class ModernController {
     /** Removes the controls and any open editor for good. */
     public void destroy() {
         if (editor != null) finishEditing(false);
+        blurHelper.stop();
         releaseInput();
         removeElements();
     }
@@ -327,14 +383,22 @@ public final class ModernController {
         return editor != null;
     }
 
+    /** Sets an optional listener notified when the layout editor closes (Done or Cancel). */
+    public void setOnEditorClosedListener(Runnable listener) {
+        this.onEditorClosed = listener;
+    }
+
     /** Opens the layout editor over the stream; input pauses until it closes. */
     public void startEditing() {
         if (editor != null) return;
         releaseInput();
+        painter.refreshTheme();
         editor = new PadEditor(context, this, painter, layout.copy(), perGame, gameKey != null);
         place();
         frame.addView(editor, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
+        blurHelper.start();
+        blurHelper.refreshBlurPreferenceNow();
     }
 
     /** Closes the editor, keeping its layout when {@code save} is true. */
@@ -348,7 +412,13 @@ public final class ModernController {
         // Cancel also restores the glyphs and pointer mode the editor previewed.
         applyAppearance();
         place();
+        if (!shown) {
+            blurHelper.stop();
+        } else {
+            blurHelper.refreshBlurPreferenceNow();
+        }
         if (onLayoutChanged != null) onLayoutChanged.run();
+        if (onEditorClosed != null) onEditorClosed.run();
     }
 
     private Runnable onLayoutChanged;

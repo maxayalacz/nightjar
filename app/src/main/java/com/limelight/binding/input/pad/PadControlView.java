@@ -63,6 +63,7 @@ final class PadControlView extends View {
     private Group group;
     /** The layer under the controls that draws a press's halo past this control's edge; null without one. */
     private View haloLayer;
+    private PadLiveBlurHelper blurHelper;
     /** The parts held at the last look ({@link PadPainter#heldParts}), and when each let go while easing back, else 0. */
     private int heldParts;
     private final long[] releasedAt = new long[PadPainter.PARTS];
@@ -197,6 +198,10 @@ final class PadControlView extends View {
     /** Where this control's press halo draws ({@link HaloLayer}). */
     void setHaloLayer(View haloLayer) {
         this.haloLayer = haloLayer;
+    }
+
+    void setBlurHelper(PadLiveBlurHelper blurHelper) {
+        this.blurHelper = blurHelper;
     }
 
     /** The knob's own view for a stick, to add above the controls; null for other controls. */
@@ -465,10 +470,15 @@ final class PadControlView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         state.now = AnimationUtils.currentAnimationTimeMillis();
-        if (knobLayer != null) {
-            painter.drawStickBase(canvas, control, 0, 0, getWidth(), getHeight(), state);
-        } else {
-            painter.draw(canvas, control, 0, 0, getWidth(), getHeight(), state);
+        painter.bindBlurView(this, blurHelper);
+        try {
+            if (knobLayer != null) {
+                painter.drawStickBase(canvas, control, 0, 0, getWidth(), getHeight(), state);
+            } else {
+                painter.draw(canvas, control, 0, 0, getWidth(), getHeight(), state);
+            }
+        } finally {
+            painter.clearBlurView();
         }
         // A touchpad's trail fades over the next frames, also once the finger lifts.
         if (restingAlpha > 0 && state.trailShows(state.now)) postInvalidateOnAnimation();

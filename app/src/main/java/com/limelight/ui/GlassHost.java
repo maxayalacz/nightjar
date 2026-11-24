@@ -96,11 +96,15 @@ public class GlassHost extends FrameLayout {
         psv.registerFrostedDrawable(portalSyncListener);
     }
 
-    /** Reloads GlassSpec and invalidates all child GlassSurfaces after Theme Studio changes. */
+    /** Reloads GlassSpec and invalidates all child GlassSurfaces after Theme Studio or rotation changes. */
     public void refreshGlass() {
         live = null;
+        if (getChildCount() > 0) {
+            getChildAt(0).invalidate();
+        }
         for (GlassSurface surface : surfaces) surface.onTierChanged();
         invalidate();
+        invalidateSurfaces();
     }
 
     /** The ambient the baked tier samples; {@code animate} crossfades to it. */
@@ -190,7 +194,13 @@ public class GlassHost extends FrameLayout {
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
-        if (live != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) live.resize(w, h);
+        live = null;
+        if (getChildCount() > 0) {
+            getChildAt(0).invalidate();
+        }
+        invalidate();
+        invalidateSurfaces();
+        postOnAnimation(this::refreshGlass);
     }
 
     @Override

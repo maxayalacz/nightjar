@@ -14,6 +14,46 @@
     android:paddingEnd="@dimen/space_l"
     android:paddingBottom="@dimen/space_s">
 
+    <!-- Collapsed floating pill header: shown by default on touch devices and expands on tap -->
+    <LinearLayout
+        android:id="@+id/pad_editor_collapsed_bar"
+        android:layout_width="wrap_content"
+        android:layout_height="44dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/pad_editor_collapsed_icon"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_tune"
+            app:tint="@color/night_primary" />
+
+        <TextView
+            android:id="@+id/pad_editor_collapsed_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="6dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/title_edit_osc_layout"
+            android:textAppearance="@style/TextAppearance.Nightjar.Label"
+            android:textColor="@color/night_on_surface" />
+
+        <ImageView
+            android:id="@+id/pad_editor_collapsed_chevron"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_expand_more"
+            app:tint="@color/night_on_surface_variant" />
+    </LinearLayout>
+
     <!-- The grip: drag it to move the panel anywhere on the screen (PadEditor). -->
     <FrameLayout
         android:id="@+id/pad_editor_grip"
@@ -23,6 +63,7 @@
         android:importantForAccessibility="yes">
 
         <View
+            android:id="@+id/pad_editor_grip_bar"
             android:layout_width="32dp"
             android:layout_height="4dp"
             android:layout_gravity="center"

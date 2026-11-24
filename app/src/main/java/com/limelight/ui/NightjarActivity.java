@@ -62,9 +62,15 @@ public abstract class NightjarActivity extends AppCompatActivity {
     private boolean finishingWithDepth = false;
     private boolean pendingFinishAfterStart = false;
     private boolean depthStartInFlight = false;
+    private boolean recreatedFromState = false;
+
+    public boolean isRecreatedFromState() {
+        return recreatedFromState;
+    }
 
     @Override
     protected void onCreate(Bundle state) {
+        recreatedFromState = (state != null);
         appearance = AppTheme.appearance(this);
         AppTheme.apply(this);
         com.limelight.utils.UiHelper.disableAllActivityTransitions(this);
@@ -131,6 +137,9 @@ public abstract class NightjarActivity extends AppCompatActivity {
     public void onConfigurationChanged(android.content.res.Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         followForm();
+        if (!recreatingForForm && !recreatingForTheme && !isFinishing() && !isDestroyed()) {
+            PortalBackgroundHelper.onConfigurationChanged(this);
+        }
     }
 
     /**

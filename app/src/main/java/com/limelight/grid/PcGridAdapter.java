@@ -288,7 +288,8 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
             size(parentView.findViewById(R.id.grid_card), R.dimen.tile_height);
             MaterialCardView cardView = parentView.findViewById(R.id.grid_card);
             com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(context);
-            cardView.setCardBackgroundColor(palette.getFrostedCardTint(0x52121826));
+            cardView.setCardBackgroundColor(Color.TRANSPARENT);
+            cardView.setCardElevation(0f);
             if (AppTheme.isHighContrast(context)) {
                 cardView.setStrokeColor(ContextCompat.getColor(context, R.color.nj_hc_color_rim));
                 cardView.setStrokeWidth(context.getResources().getDimensionPixelSize(R.dimen.nj_glass_chrome_solid_rim_width));
@@ -297,6 +298,10 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
                 int strokePx = outlineScale <= 0f ? 0 : Math.max(1, Math.round(context.getResources().getDisplayMetrics().density * outlineScale));
                 cardView.setStrokeColor(palette.getCardRimColor());
                 cardView.setStrokeWidth(strokePx);
+            }
+            View cardSurface = parentView.findViewById(R.id.grid_card_surface);
+            if (cardSurface instanceof com.limelight.ui.PcCardSurface) {
+                ((com.limelight.ui.PcCardSurface) cardSurface).refreshTheme(null);
             }
             tiles.show(face, obj.details.uuid, obj.runningGame, state, TileBackdrops.Cut.SCREEN);
         } else {

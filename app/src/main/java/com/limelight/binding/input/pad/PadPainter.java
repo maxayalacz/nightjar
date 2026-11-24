@@ -105,7 +105,8 @@ final class PadPainter {
         }
     }
 
-    private static final int GLASS = 0x520A0D12, GLASS_HELD = 0x7A0A0D12, RIM = 0x8CFFFFFF, RIM_PRESSED = 0x40FFFFFF,
+    private static final int GLASS_NEUTRAL = 0x75141414, GLASS_BLUR_NEUTRAL = 0x5C141414,
+            GLASS_HELD_NEUTRAL = 0x941E1E1E, RIM_NEUTRAL = 0x99FFFFFF,
             LABEL = 0xF2FFFFFF, SHADOW = 0x38000000, SHADOW_SOFT = 0x1A000000, DOTS = 0x33FFFFFF;
     /**
      * The face glyphs' colours per controller family, in {@link PadInput#FACE_CENTERS} order; null for the labels'
@@ -120,43 +121,36 @@ final class PadPainter {
      * In dp: the stroke the stick geometry is measured with, how far a shape that fills its box stays inside it (its
      * shadow's room), the rim, how far a press sinks a shape, and the shadow's drop and reach.
      */
-    private static final float STROKE_DP = 1.5f, EDGE_DP = 3, RIM_DP = 1.25f, PRESS_IN_DP = 2, SHADOW_DROP_DP = 1,
+    private static final float STROKE_DP = 1.5f, EDGE_DP = 3, RIM_DP = 1.35f, PRESS_IN_DP = 1.5f, SHADOW_DROP_DP = 1,
             SHADOW_REACH_DP = 2;
     /** The halo's reach past the edge in dp and its strength in rings from the edge out, and how far the press ring runs. */
     private static final float HALO_DP = 12, RIPPLE_DP = 20;
     private static final float[] HALO = {.40f, .28f, .18f, .10f, .05f, .02f};
     /** A face cluster's free sliver between its buttons and its box, as a share of the box's shorter side. */
     private static final float FACE_SLACK = 1 - PadInput.FACE_CENTERS[0][1] - PadInput.FACE_RADIUS;
-    /** The stick base's well: how far below the middle its shade is centred, as a share of the radius. */
-    private static final float WELL_LIFT = .16f;
 
-    private final int accent, onAccent;
+    private final Context context;
+    private int accent, highlightColor, onAccent;
+    private int glassFill, glassBlurFill, glassHeldFill, glassPressedFill;
+    private int rimColor, rimPressedColor, labelColor;
+    private float outlineScale = 1f;
     private final float density, edgeStroke;
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG), stroke = new Paint(Paint.ANTI_ALIAS_FLAG),
             text = new Paint(Paint.ANTI_ALIAS_FLAG), dashed = new Paint(Paint.ANTI_ALIAS_FLAG),
             ring = new Paint(Paint.ANTI_ALIAS_FLAG), dots = new Paint(Paint.ANTI_ALIAS_FLAG),
             trail = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final RectF rect = new RectF(), inner = new RectF(), chip = new RectF();
-    private final Path path = new Path(), unitPath = new Path(), clip = new Path();
-    private final Matrix matrix = new Matrix();
+    private final RectF rect = new RectF(), inner = new RectF(), chip = new RectF(), blurBounds = new RectF();
+    private final Path path = new Path(), clip = new Path(), blurClip = new Path();
     /** The held knob's shadow: a disc this much larger than the knob, dropped this share of its radius. */
     private static final float SHADOW_SCALE = 1.2f, SHADOW_DROP = .12f;
-    // Unit shaders (radius 1, or the box 0..1): the canvas is moved and scaled onto each shape instead of the shader,
-    // so a frame neither allocates nor rebuilds a native shader.
     private final Paint knobShadow = shaderPaint(new RadialGradient(0, 0, 1,
-            new int[] {0x66000000, 0x4D000000, 0x00000000}, new float[] {0, .8f, 1}, Shader.TileMode.CLAMP));
+            new int[] {0x55000000, 0x33000000, 0x00000000}, new float[] {0, .8f, 1}, Shader.TileMode.CLAMP));
     /** Round under a disc: clear in the middle, darkest just inside the edge, gone a little past it. */
     private final Paint discShadow = shaderPaint(new RadialGradient(0, 0, 1,
-            new int[] {0, 0, 0x47000000, 0}, new float[] {0, .7f, .9f, 1}, Shader.TileMode.CLAMP));
-    /** The light from above on glass, over the box 0..1. */
-    private final Paint highlight = shaderPaint(new LinearGradient(0, 0, 0, 1,
-            new int[] {0x4DFFFFFF, 0x14FFFFFF, 0x00FFFFFF}, new float[] {0, .46f, .72f}, Shader.TileMode.CLAMP));
-    /** The stick base's well: shade under its upper wall. */
-    private final Paint well = shaderPaint(new RadialGradient(0, 0, 1,
-            new int[] {0, 0, 0x45000000}, new float[] {0, .78f, 1}, Shader.TileMode.CLAMP));
-    private final Paint knobGloss = shaderPaint(new RadialGradient(-.35f, -.45f, 1.45f,
-            new int[] {0xFFFFFFFF, 0xFFE9EBEF, 0xFFAFB4BE}, new float[] {0, .45f, 1}, Shader.TileMode.CLAMP));
-    private final Paint knobGlossPressed, fingerGlow;
+            new int[] {0, 0, 0x38000000, 0}, new float[] {0, .7f, .9f, 1}, Shader.TileMode.CLAMP));
+    private Paint fingerGlow;
+    private android.view.View blurView;
+    private PadLiveBlurHelper blurHelper;
     /** The face letters and shoulder names; the layout editor changes it and every view redraws. */
     private PadLayout.Glyph glyph = PadLayout.Glyph.XBOX;
     /** The face cluster's buttons stand in the Nintendo arrangement ({@link PadLayout#facesSwapped}). */
@@ -170,12 +164,11 @@ final class PadPainter {
     private final String mouseWord, cameraWord;
 
     PadPainter(Context context) {
+        this.context = context;
         density = context.getResources().getDisplayMetrics().density;
         mouseWord = context.getString(R.string.pad_touchpad_chip_mouse);
         cameraWord = context.getString(R.string.pad_touchpad_chip_camera);
         edgeStroke = STROKE_DP * density;
-        accent = ContextCompat.getColor(context, R.color.night_primary);
-        onAccent = ContextCompat.getColor(context, R.color.night_on_primary);
         stroke.setStyle(Paint.Style.STROKE);
         stroke.setStrokeWidth(edgeStroke);
         stroke.setStrokeCap(Paint.Cap.ROUND);
@@ -191,11 +184,59 @@ final class PadPainter {
         dots.setColor(DOTS);
         trail.setStyle(Paint.Style.STROKE);
         trail.setStrokeCap(Paint.Cap.ROUND);
-        knobGlossPressed = shaderPaint(new RadialGradient(-.35f, -.45f, 1.45f,
-                new int[] {ColorUtils.blendARGB(accent, 0xFFFFFFFF, .45f), accent, ColorUtils.blendARGB(accent, 0xFF000000, .2f)},
-                new float[] {0, .5f, 1}, Shader.TileMode.CLAMP));
-        fingerGlow = shaderPaint(new RadialGradient(0, 0, 1, new int[] {alpha(accent, .55f), alpha(accent, 0)},
+        refreshTheme();
+    }
+
+    /** Reloads active AppThemePalette colors and OSC outline thickness preference. */
+    void refreshTheme() {
+        if (com.limelight.ui.PortalBackgroundHelper.isRobolectric()) {
+            accent = ContextCompat.getColor(context, R.color.night_primary);
+            highlightColor = accent;
+            onAccent = ContextCompat.getColor(context, R.color.night_on_primary);
+            glassFill = GLASS_NEUTRAL;
+            glassBlurFill = GLASS_BLUR_NEUTRAL;
+            glassHeldFill = GLASS_HELD_NEUTRAL;
+            glassPressedFill = accent;
+            rimColor = RIM_NEUTRAL;
+            rimPressedColor = accent;
+            labelColor = LABEL;
+            outlineScale = 1f;
+        } else {
+            com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(context);
+            com.limelight.preferences.PreferenceConfiguration cfg =
+                    com.limelight.preferences.PreferenceConfiguration.readPreferences(context);
+            accent = palette.getNeonAccent();
+            highlightColor = palette.highlight;
+            onAccent = ColorUtils.calculateLuminance(accent) > 0.45 ? 0xFF0B0E14 : 0xFFFFFFFF;
+            int baseRgb = ColorUtils.blendARGB(0xFF101624, palette.surface | 0xFF000000, 0.34f) & 0x00FFFFFF;
+            int pressedRgb = ColorUtils.blendARGB(0xFF1A2236, accent | 0xFF000000, 0.38f) & 0x00FFFFFF;
+            glassFill = (0x75 << 24) | baseRgb;
+            glassBlurFill = (0x5C << 24) | baseRgb;
+            glassHeldFill = (0x8F << 24) | baseRgb;
+            glassPressedFill = (0x9E << 24) | pressedRgb;
+            int outlineRgb = (palette.cardOutline & 0x00FFFFFF);
+            rimColor = (0x99 << 24) | outlineRgb;
+            rimPressedColor = (0xF2 << 24) | (highlightColor & 0x00FFFFFF);
+            labelColor = (0xF2 << 24) | (palette.getPrimaryTextColor() & 0x00FFFFFF);
+            outlineScale = Math.max(0f, cfg.oscOutlineThicknessPercent / 100f);
+        }
+        fingerGlow = shaderPaint(new RadialGradient(0, 0, 1,
+                new int[] {alpha(highlightColor, .58f), alpha(accent, 0)},
                 new float[] {.3f, 1}, Shader.TileMode.CLAMP));
+    }
+
+    void bindBlurView(android.view.View view, PadLiveBlurHelper helper) {
+        this.blurView = view;
+        this.blurHelper = helper;
+    }
+
+    void clearBlurView() {
+        this.blurView = null;
+        this.blurHelper = null;
+    }
+
+    private float rimWidth() {
+        return outlineScale <= 0.01f ? 0f : Math.max(1f, RIM_DP * density * outlineScale);
     }
 
     private static Paint shaderPaint(Shader shader) {
@@ -206,6 +247,10 @@ final class PadPainter {
 
     int accent() {
         return accent;
+    }
+
+    int highlight() {
+        return highlightColor;
     }
 
     /** The word the pointer touchpad shows for its mode, in play and in the editor. */
@@ -502,8 +547,8 @@ final class PadPainter {
     private float ripple(State state, int part, float alpha, long now) {
         if (!rippling(state, part, now)) return -1;
         float t = (now - state.pressedAt[part]) / (float) RIPPLE_MS, rest = 1 - t;
-        ring.setStrokeWidth(2 * density);
-        ring.setColor(alpha(accent, alpha * .6f * rest * rest));
+        ring.setStrokeWidth(2.2f * density);
+        ring.setColor(alpha(highlightColor, alpha * .72f * rest * rest));
         return (2 + (RIPPLE_DP - 2) * (1 - rest * rest)) * density;
     }
 
@@ -526,27 +571,6 @@ final class PadPainter {
         canvas.restoreToCount(saved);
     }
 
-    /** The light from above on an oval. */
-    private void highlightOval(Canvas canvas, float cx, float cy, float rx, float ry) {
-        if (rx <= 0 || ry <= 0) return;
-        int saved = canvas.save();
-        canvas.translate(cx - rx, cy - ry);
-        canvas.scale(2 * rx, 2 * ry);
-        canvas.drawOval(0, 0, 1, 1, highlight);
-        canvas.restoreToCount(saved);
-    }
-
-    /** The light from above on a rounded rectangle; the box is scaled to 0..1, so the corners stay round. */
-    private void highlightRound(Canvas canvas, RectF shape, float radius) {
-        float w = shape.width(), h = shape.height();
-        if (w <= 0 || h <= 0) return;
-        int saved = canvas.save();
-        canvas.translate(shape.left, shape.top);
-        canvas.scale(w, h);
-        canvas.drawRoundRect(0, 0, 1, 1, radius / w, radius / h, highlight);
-        canvas.restoreToCount(saved);
-    }
-
     /** A soft shadow along a rounded rectangle's edge, dropped a little; {@code reach} past the edge at most. */
     private void shadowRound(Canvas canvas, RectF shape, float radius, float reach, float strength) {
         if (reach <= 0 || strength <= 0) return;
@@ -561,9 +585,29 @@ final class PadPainter {
         canvas.restoreToCount(saved);
     }
 
+    private boolean drawBlurOval(Canvas canvas, float cx, float cy, float rx, float ry) {
+        if (blurHelper == null || blurView == null || rx <= 0 || ry <= 0) return false;
+        blurClip.reset();
+        blurBounds.set(cx - rx, cy - ry, cx + rx, cy + ry);
+        if (rx == ry) {
+            blurClip.addCircle(cx, cy, rx, Path.Direction.CW);
+        } else {
+            blurClip.addOval(blurBounds, Path.Direction.CW);
+        }
+        return blurHelper.drawOscBlurForBounds(canvas, blurView, blurClip, blurBounds, 1f);
+    }
+
+    private boolean drawBlurRound(Canvas canvas, RectF shape, float radius) {
+        if (blurHelper == null || blurView == null || shape.width() <= 0 || shape.height() <= 0) return false;
+        blurClip.reset();
+        blurClip.addRoundRect(shape, radius, radius, Path.Direction.CW);
+        blurBounds.set(shape);
+        return blurHelper.drawOscBlurForBounds(canvas, blurView, blurClip, blurBounds, 1f);
+    }
+
     /**
-     * A round glass part pressed in by {@code level}: its shadow, then the disc or oval sunk in by the press, filling
-     * with amber, its light from above and its rim. The shadow keeps within {@code reach} of the edge.
+     * A round Moonlight-styled frosted glass part pressed in by {@code level}: optional live stream blur, flat
+     * frosted surface fill (no specular sheen), and crisp outline rim scaled by OSC outline thickness.
      */
     private void disc(Canvas canvas, float cx, float cy, float rx, float ry, float level, float reach) {
         if (level < 1 && reach > 0) {
@@ -574,31 +618,35 @@ final class PadPainter {
         float sink = PRESS_IN_DP * density * level;
         rx -= sink;
         ry -= sink;
-        fill.setColor(blend(GLASS, accent, level));
+        boolean blurred = drawBlurOval(canvas, cx, cy, rx, ry);
+        fill.setColor(blend(blurred ? glassBlurFill : glassFill, glassPressedFill, level));
         oval(canvas, cx, cy, rx, ry, fill);
-        highlightOval(canvas, cx, cy, rx, ry);
-        float rim = RIM_DP * density;
-        stroke.setStrokeWidth(rim);
-        stroke.setColor(blend(RIM, RIM_PRESSED, level));
-        oval(canvas, cx, cy, rx - rim / 2, ry - rim / 2, stroke);
+        float rim = rimWidth();
+        if (rim > 0.1f) {
+            stroke.setStrokeWidth(rim);
+            stroke.setColor(blend(rimColor, rimPressedColor, level));
+            oval(canvas, cx, cy, rx - rim / 2, ry - rim / 2, stroke);
+        }
     }
 
-    /** A rounded glass part pressed in by {@code level}, as {@link #disc}; afterwards {@link #inner} holds its shape. */
+    /** A rounded Moonlight-styled frosted glass part pressed in by {@code level}; afterwards {@link #inner} holds its shape. */
     private void slab(Canvas canvas, RectF shape, float radius, float level, float reach) {
         if (level < 1) shadowRound(canvas, shape, radius, reach, 1 - level);
         float sink = PRESS_IN_DP * density * level;
         inner.set(shape);
         inner.inset(sink, sink);
         float r = Math.max(0, radius - sink);
-        fill.setColor(blend(GLASS, accent, level));
+        boolean blurred = drawBlurRound(canvas, inner, r);
+        fill.setColor(blend(blurred ? glassBlurFill : glassFill, glassPressedFill, level));
         canvas.drawRoundRect(inner, r, r, fill);
-        highlightRound(canvas, inner, r);
-        float rim = RIM_DP * density;
-        stroke.setStrokeWidth(rim);
-        stroke.setColor(blend(RIM, RIM_PRESSED, level));
-        rect.set(inner);
-        rect.inset(rim / 2, rim / 2);
-        canvas.drawRoundRect(rect, Math.max(0, r - rim / 2), Math.max(0, r - rim / 2), stroke);
+        float rim = rimWidth();
+        if (rim > 0.1f) {
+            stroke.setStrokeWidth(rim);
+            stroke.setColor(blend(rimColor, rimPressedColor, level));
+            rect.set(inner);
+            rect.inset(rim / 2, rim / 2);
+            canvas.drawRoundRect(rect, Math.max(0, r - rim / 2), Math.max(0, r - rim / 2), stroke);
+        }
     }
 
     private void label(Canvas canvas, String label, float cx, float cy, float size, int color) {
@@ -613,38 +661,31 @@ final class PadPainter {
     }
 
     /**
-     * A stick's base: a glass well, shaded under its upper wall and lit on its lower one, with its rim, a ring where the
-     * knob rests and ticks at the four directions; while pushed, an amber arc on the rim points where, growing and
-     * glowing with the push. The WASD stick shows its four keys instead of the ticks, a held one in amber.
+     * A stick's base: Moonlight-style translucent frosted disc with live blur, deadzone ring, cardinal ticks, and
+     * Nightjar's directional outer rim arc following active theme colors.
      */
     void drawStickBase(Canvas canvas, PadLayout.Control control, float left, float top, float width, float height,
                        State state) {
         stickGeometry(Math.min(width, height));
         float base = stickBase;
         float cx = left + width / 2, cy = top + height / 2;
-        fill.setColor(state.stickActive ? GLASS_HELD : GLASS);
+        boolean blurred = drawBlurOval(canvas, cx, cy, base, base);
+        fill.setColor(state.stickActive ? glassHeldFill : (blurred ? glassBlurFill : glassFill));
         canvas.drawCircle(cx, cy, base, fill);
-        // The shade's centre sits below the middle, so the upper wall is darkest.
-        int saved = canvas.save();
-        canvas.translate(cx, cy + base * WELL_LIFT);
-        canvas.scale(base, base);
-        canvas.drawCircle(0, -WELL_LIFT, 1, well);
-        canvas.restoreToCount(saved);
-        stroke.setStrokeWidth(density);
-        stroke.setColor(0x29FFFFFF);
-        float lit = base - 2.5f * density;
-        rect.set(cx - lit, cy - lit, cx + lit, cy + lit);
-        canvas.drawArc(rect, 30, 120, false, stroke);
-        float rim = RIM_DP * density;
-        stroke.setStrokeWidth(rim);
-        stroke.setColor(RIM);
-        canvas.drawCircle(cx, cy, base - rim / 2, stroke);
-        stroke.setStrokeWidth(density);
-        stroke.setColor(0x1FFFFFFF);
-        canvas.drawCircle(cx, cy, base * .64f, stroke);
+
+        float rim = rimWidth();
+        if (rim > 0.1f) {
+            stroke.setStrokeWidth(rim);
+            stroke.setColor(rimColor);
+            canvas.drawCircle(cx, cy, base - rim / 2, stroke);
+
+            stroke.setStrokeWidth(Math.max(1f, rim * 0.7f));
+            stroke.setColor(alpha(rimColor, 0.36f));
+            canvas.drawCircle(cx, cy, base * .64f, stroke);
+        }
         if (control != PadLayout.Control.WASD) {
             stroke.setStrokeWidth(1.5f * density);
-            stroke.setColor(0x52FFFFFF);
+            stroke.setColor(alpha(labelColor, 0.34f));
             for (int i = 0; i < 4; i++) {
                 int dx = i == 0 ? 1 : i == 2 ? -1 : 0, dy = i == 1 ? 1 : i == 3 ? -1 : 0;
                 canvas.drawLine(cx + dx * base * .80f, cy + dy * base * .80f, cx + dx * base * .89f, cy + dy * base * .89f, stroke);
@@ -656,10 +697,10 @@ final class PadPainter {
             float sweep = 30 + 60 * magnitude;
             float r = base - 3.5f * density;
             rect.set(cx - r, cy - r, cx + r, cy + r);
-            stroke.setColor(alpha(accent, .3f * magnitude));
+            stroke.setColor(alpha(accent, .36f * magnitude));
             stroke.setStrokeWidth((5 + 3 * magnitude) * density);
             canvas.drawArc(rect, angle - sweep / 2, sweep, false, stroke);
-            stroke.setColor(accent);
+            stroke.setColor(highlightColor);
             stroke.setStrokeWidth((2.5f + 2 * magnitude) * density);
             canvas.drawArc(rect, angle - sweep / 2, sweep, false, stroke);
         }
@@ -673,18 +714,15 @@ final class PadPainter {
     }
 
     private void wasdLabel(Canvas canvas, String key, float cx, float cy, float size, float level) {
-        label(canvas, key, cx, cy, size, blend(LABEL, accent, level));
+        label(canvas, key, cx, cy, size, blend(labelColor, highlightColor, level));
     }
 
     /**
-     * A stick's knob for the control in the box ({@code left}, {@code top}, {@code width},
-     * {@code height}): glossy, lit from the upper left. Its centre travels to the base's rim at full deflection, so the
-     * canvas must reach {@link #knobOverhang} past the box on every side; while held it lifts on a soft shadow.
+     * A stick's floating frosted glass thumb knob, matching Moonlight OSC's clean thumb disc.
      */
     void drawStickKnob(Canvas canvas, PadLayout.Control control, float left, float top, float width, float height, State state) {
         stickGeometry(Math.min(width, height));
         float base = stickBase, knob = stickKnob;
-        // The base stays put; a floating stick's knob starts where the thumb landed.
         float cx = left + width / 2, cy = top + height / 2;
         float originX = cx, originY = cy;
         if (state.stickActive && !Float.isNaN(state.centerX)) {
@@ -693,29 +731,32 @@ final class PadPainter {
         }
         StickMath.knob(cx, cy, originX, originY, state.stickX, state.stickY, base, knobAt);
         float kx = knobAt[0], ky = knobAt[1];
-        // Light from above: the shadow falls a little below the knob and fades out past its edge; resting, it is faint.
         float shadow = knob * SHADOW_SCALE;
-        knobShadow.setAlpha(state.stickActive ? 255 : 128);
+        knobShadow.setAlpha(state.stickActive ? 220 : 110);
         int saved = canvas.save();
         canvas.translate(kx, ky + knob * SHADOW_DROP);
         canvas.scale(shadow, shadow);
         canvas.drawCircle(0, 0, 1, knobShadow);
         canvas.restoreToCount(saved);
+
         boolean clicked = (state.flags & PadInput.buttonFlag(control)) != 0;
-        // Held, the knob is solid: it sits on top of the rim it rides over, not behind glass.
-        Paint gloss = clicked ? knobGlossPressed : knobGloss;
-        gloss.setAlpha(clicked || state.stickActive ? 255 : 0xA6);
-        unit(canvas, gloss, kx, ky, knob, knob);
-        stroke.setStrokeWidth(density);
-        stroke.setColor(0x33000000);
-        canvas.drawCircle(kx, ky, knob - density / 2, stroke);
+        int knobFill = clicked ? glassPressedFill
+                : ColorUtils.setAlphaComponent(glassHeldFill | 0xFF000000, state.stickActive ? 0xD8 : 0xB8);
+        fill.setColor(knobFill);
+        canvas.drawCircle(kx, ky, knob, fill);
+
+        float rim = Math.max(1.5f * density, rimWidth() * 0.9f);
+        stroke.setStrokeWidth(rim);
+        stroke.setColor(clicked ? rimPressedColor : (state.stickActive ? highlightColor : alpha(labelColor, 0.86f)));
+        canvas.drawCircle(kx, ky, knob - rim / 2, stroke);
+
         if (clicked) {
-            label(canvas, control == PadLayout.Control.LEFT_STICK ? "L3" : "R3", kx, ky, knob * .7f, onAccent);
+            label(canvas, control == PadLayout.Control.LEFT_STICK ? "L3" : "R3", kx, ky, knob * .68f,
+                    com.limelight.ui.PortalBackgroundHelper.isRobolectric() ? onAccent : highlightColor);
         } else {
-            // A small ring in the knob, like a thumb grip.
-            stroke.setStrokeWidth(1.5f * density);
-            stroke.setColor(state.stickActive ? 0x2E000000 : 0x40000000);
-            canvas.drawCircle(kx, ky, knob * .55f, stroke);
+            stroke.setStrokeWidth(1.35f * density);
+            stroke.setColor(alpha(labelColor, state.stickActive ? 0.36f : 0.24f));
+            canvas.drawCircle(kx, ky, knob * .54f, stroke);
         }
     }
 
@@ -739,9 +780,7 @@ final class PadPainter {
     }
 
     /**
-     * The D-pad as one bevelled glass cross whose arms reach the box's edges, so a wide or tall box spreads it as
-     * {@link PadInput#dpad} reads it; the arms keep the thickness of the box's shorter side. A held arm lights amber and
-     * eases back once let go; a dimple marks the middle.
+     * The D-pad as one connected frosted glass cross with live blur, themed pressed arms, and crisp border.
      */
     private void drawDpad(Canvas canvas, float left, float top, float width, float height, State state) {
         float size = Math.min(width, height), edge = EDGE_DP * density;
@@ -749,7 +788,6 @@ final class PadPainter {
         float cx = left + width / 2, cy = top + height / 2;
         float l = left + edge, t = top + edge, w = width - 2 * edge, h = height - 2 * edge;
         plusOutline(l, t, w, h, arm, r);
-        // Its shadow along the outline, then the glass.
         float reach = SHADOW_REACH_DP * density;
         int saved = canvas.save();
         canvas.translate(0, Math.min(SHADOW_DROP_DP * density, reach / 2));
@@ -760,30 +798,30 @@ final class PadPainter {
         ring.setColor(SHADOW);
         canvas.drawPath(path, ring);
         canvas.restoreToCount(saved);
-        fill.setColor(GLASS);
+
+        boolean blurred = false;
+        if (blurHelper != null && blurView != null && w > 0 && h > 0) {
+            blurBounds.set(l, t, l + w, t + h);
+            blurred = blurHelper.drawOscBlurForBounds(canvas, blurView, path, blurBounds, 1f);
+        }
+        fill.setColor(blurred ? glassBlurFill : glassFill);
         canvas.drawPath(path, fill);
+
         float reachX = (w - arm) / 2, reachY = (h - arm) / 2;
         armFill(canvas, state.press[0], cx - arm / 2, t, cx + arm / 2, t + reachY + r, r);
         armFill(canvas, state.press[1], cx - arm / 2, t + h - reachY - r, cx + arm / 2, t + h, r);
         armFill(canvas, state.press[2], l, cy - arm / 2, l + reachX + r, cy + arm / 2, r);
         armFill(canvas, state.press[3], l + w - reachX - r, cy - arm / 2, l + w, cy + arm / 2, r);
-        // The light from above over the whole cross: its outline taken to the box's 0..1 and scaled back.
-        if (w > 0 && h > 0) {
-            matrix.setTranslate(-l, -t);
-            matrix.postScale(1 / w, 1 / h);
-            path.transform(matrix, unitPath);
-            saved = canvas.save();
-            canvas.translate(l, t);
-            canvas.scale(w, h);
-            canvas.drawPath(unitPath, highlight);
-            canvas.restoreToCount(saved);
+
+        fill.setColor(0x28000000);
+        canvas.drawCircle(cx, cy, arm * .24f, fill);
+        float rim = rimWidth();
+        if (rim > 0.1f) {
+            float maxPress = Math.max(Math.max(state.press[0], state.press[1]), Math.max(state.press[2], state.press[3]));
+            stroke.setStrokeWidth(rim);
+            stroke.setColor(blend(rimColor, rimPressedColor, maxPress * 0.65f));
+            canvas.drawPath(path, stroke);
         }
-        fill.setColor(0x2E000000);
-        canvas.drawCircle(cx, cy, arm * .26f, fill);
-        float rim = RIM_DP * density;
-        stroke.setStrokeWidth(rim);
-        stroke.setColor(RIM);
-        canvas.drawPath(path, stroke);
         float chevron = arm * .22f, insetX = reachX * .5f, insetY = reachY * .5f;
         chevron(canvas, cx, t + insetY, 0, -1, chevron, state.press[0]);
         chevron(canvas, cx, t + h - insetY, 0, 1, chevron, state.press[1]);
@@ -822,19 +860,19 @@ final class PadPainter {
 
     private void armFill(Canvas canvas, float level, float l, float t, float r, float b, float radius) {
         if (level <= 0) return;
-        fill.setColor(alpha(accent, level));
+        fill.setColor(alpha(glassPressedFill, level));
         canvas.drawRoundRect(l, t, r, b, radius, radius, fill);
     }
 
     private void chevron(Canvas canvas, float cx, float cy, int dx, int dy, float s, float level) {
         path.reset();
-        // Tip toward (dx, dy), arms back from it.
         float tipX = cx + dx * s * .6f, tipY = cy + dy * s * .6f;
         float backX = cx - dx * s * .4f, backY = cy - dy * s * .4f;
         path.moveTo(backX - dy * s, backY + dx * s);
         path.lineTo(tipX, tipY);
         path.lineTo(backX + dy * s, backY - dx * s);
-        stroke.setColor(blend(LABEL, onAccent, level));
+        int pressedFg = com.limelight.ui.PortalBackgroundHelper.isRobolectric() ? onAccent : highlightColor;
+        stroke.setColor(blend(labelColor, pressedFg, level));
         stroke.setStrokeWidth(2 * density);
         canvas.drawPath(path, stroke);
     }
@@ -845,7 +883,6 @@ final class PadPainter {
      */
     private void drawFace(Canvas canvas, float left, float top, float width, float height, State state) {
         float size = Math.min(width, height), r = size * PadInput.FACE_RADIUS;
-        // The buttons leave a sliver of the box free around them; their shadows stay inside it.
         float reach = Math.max(0, Math.min(SHADOW_REACH_DP * density, size * FACE_SLACK - SHADOW_DROP_DP * density));
         for (int i = 0; i < PadInput.FACE_CENTERS.length; i++) {
             float cx = left + PadInput.FACE_CENTERS[i][0] * width, cy = top + PadInput.FACE_CENTERS[i][1] * height;
@@ -865,14 +902,13 @@ final class PadPainter {
         faceGlyph(canvas, control.memberIndex(), cx, cy, Math.min(rx, ry) - PRESS_IN_DP * density * level, level);
     }
 
-    /**
-     * The glyph on the face button at {@code index} of radius {@code r}: the family's letter, or PlayStation's shapes
-     * drawn as lines so they stay crisp at any size; in the family's colour (PlayStation's neutral), dark on amber
-     * while pressed.
-     */
     private void faceGlyph(Canvas canvas, int index, float cx, float cy, float r, float level) {
         int[] colors = FACE_COLORS[glyph.ordinal()];
-        int color = blend(colors == null ? LABEL : colors[index], onAccent, level);
+        int restCol = colors == null ? labelColor : colors[index];
+        int pressedFg = com.limelight.ui.PortalBackgroundHelper.isRobolectric()
+                ? onAccent
+                : (colors == null ? highlightColor : ColorUtils.blendARGB(colors[index], 0xFFFFFFFF, 0.35f));
+        int color = blend(restCol, pressedFg, level);
         if (glyph != PadLayout.Glyph.PLAYSTATION) {
             label(canvas, PadGlyphs.face(glyph, index), cx, cy, r * .95f, color);
             return;
@@ -892,7 +928,7 @@ final class PadPainter {
                 rect.set(cx - s * .78f, cy - s * .78f, cx + s * .78f, cy + s * .78f);
                 canvas.drawRoundRect(rect, s * .1f, s * .1f, stroke);
                 break;
-            default: // Triangle, raised a little so it looks centred
+            default: // Triangle
                 path.reset();
                 path.moveTo(cx, cy - s);
                 path.lineTo(cx + s * .98f, cy + s * .66f);
@@ -903,16 +939,11 @@ final class PadPainter {
         }
     }
 
-    /** The corner radius of a split D-pad arm in {@code shape}, rounded as the cross's arms are. */
     private static float armRadius(RectF shape, boolean vertical) {
         float thickness = vertical ? shape.width() : shape.height();
         return Math.min(thickness * PadInput.DPAD_CORNER / PadInput.DPAD_ARM, Math.min(shape.width(), shape.height()) / 2);
     }
 
-    /**
-     * One direction of a split D-pad: its arm filling the box, rounded as the D-pad's arms are, with its chevron
-     * pointing out; amber while held.
-     */
     private void drawDpadArm(Canvas canvas, PadLayout.Control control, float left, float top, float width, float height,
                              State state) {
         boolean vertical = control == PadLayout.Control.DPAD_UP || control == PadLayout.Control.DPAD_DOWN;
@@ -931,13 +962,12 @@ final class PadPainter {
         float level = state.press[0], edge = EDGE_DP * density;
         RectF shape = chip;
         shape.set(left + edge, top + edge, left + width - edge, top + height - edge);
-        // A stadium filling the box, lying or standing: the shorter side is the round end.
         float thickness = Math.min(shape.width(), shape.height());
         slab(canvas, shape, thickness / 2, level, SHADOW_REACH_DP * density);
         float sunk = Math.min(inner.width(), inner.height());
-        int color = blend(LABEL, onAccent, level);
+        int pressedFg = com.limelight.ui.PortalBackgroundHelper.isRobolectric() ? onAccent : highlightColor;
+        int color = blend(labelColor, pressedFg, level);
         if (control == PadLayout.Control.TOUCHPAD) {
-            // Touchpad: a small pad with its click line, like the one on a PlayStation pad.
             float h = sunk * .4f, w = Math.min(inner.width() * .5f, h * 1.8f);
             float l = inner.centerX() - w / 2, t = inner.centerY() - h / 2;
             stroke.setColor(color);
@@ -949,7 +979,6 @@ final class PadPainter {
         }
         String name = PadGlyphs.shoulder(control, glyph);
         if (name == null) name = pillLabel(control);
-        // A long label (the grips') shrinks to stay inside the pill.
         text.setTextSize(sunk * .42f);
         float fit = Math.min(1, inner.width() * .8f / Math.max(1, text.measureText(name)));
         label(canvas, name, inner.centerX(), inner.centerY(), sunk * .42f * fit, color);
@@ -964,10 +993,8 @@ final class PadPainter {
     }
 
     /**
-     * A touchpad: a rounded glass pad with a faint dot grid, its rim lit amber while touched. A Steam Controller
-     * trackpad shows its side's {@code letter} in the middle; the pointer touchpad shows its mode's word as a small chip
-     * in a corner ({@code word}), so a glance says whether it moves the pointer or the camera. The finger shows as an
-     * amber dot with a short trail that fades behind it.
+     * A touchpad: Moonlight-style rounded frosted glass pad with live blur, subtle dot grid, themed mode chip, and
+     * Nightjar's themed touch indicator + trailing fade.
      */
     private void drawPad(Canvas canvas, float left, float top, float width, float height, State state, float corner,
                          String letter, String word) {
@@ -976,32 +1003,33 @@ final class PadPainter {
         shape.set(left + edge, top + edge, left + width - edge, top + height - edge);
         float size = Math.min(shape.width(), shape.height()), radius = size * corner;
         shadowRound(canvas, shape, radius, SHADOW_REACH_DP * density, 1);
-        fill.setColor(blend(GLASS, GLASS_HELD, level));
+        boolean blurred = drawBlurRound(canvas, shape, radius);
+        fill.setColor(blend(blurred ? glassBlurFill : glassFill, glassHeldFill, level));
         canvas.drawRoundRect(shape, radius, radius, fill);
-        highlightRound(canvas, shape, radius);
         drawDots(canvas, shape, radius);
-        float rim = RIM_DP * density;
-        stroke.setStrokeWidth(rim);
-        stroke.setColor(blend(RIM, accent, level));
-        rect.set(shape);
-        rect.inset(rim / 2, rim / 2);
-        canvas.drawRoundRect(rect, radius, radius, stroke);
-        if (letter != null) label(canvas, letter, shape.centerX(), shape.centerY(), size * .22f, alpha(LABEL, .6f));
+        float rim = rimWidth();
+        if (rim > 0.1f) {
+            stroke.setStrokeWidth(rim);
+            stroke.setColor(blend(rimColor, rimPressedColor, level));
+            rect.set(shape);
+            rect.inset(rim / 2, rim / 2);
+            canvas.drawRoundRect(rect, radius, radius, stroke);
+        }
+        if (letter != null) label(canvas, letter, shape.centerX(), shape.centerY(), size * .22f, alpha(labelColor, .6f));
         if (word != null && !word.isEmpty()) drawChip(canvas, word, shape, size, radius);
         drawTrail(canvas, left, top, width, height, state);
         if (!Float.isNaN(state.touchX)) {
             float fx = left + Math.max(0, Math.min(width, state.touchX)), fy = top + Math.max(0, Math.min(height, state.touchY));
             float dot = Math.min(7 * density, size * .1f);
             unit(canvas, fingerGlow, fx, fy, dot * 2.6f, dot * 2.6f);
-            fill.setColor(accent);
+            fill.setColor(highlightColor);
             canvas.drawCircle(fx, fy, dot, fill);
             stroke.setStrokeWidth(1.5f * density);
-            stroke.setColor(0xCCFFFFFF);
+            stroke.setColor(0xD8FFFFFF);
             canvas.drawCircle(fx, fy, dot, stroke);
         }
     }
 
-    /** A faint grid of dots over a touchpad's surface, one draw for all of them. */
     private void drawDots(Canvas canvas, RectF area, float radius) {
         float step = 16 * density, margin = Math.max(radius * .7f, 12 * density);
         float l = area.left + margin, t = area.top + margin, r = area.right - margin, b = area.bottom - margin;
@@ -1021,22 +1049,20 @@ final class PadPainter {
         canvas.drawPoints(dotPoints, 0, k, dots);
     }
 
-    /** The pointer touchpad's mode word as a small amber chip in its upper left corner, sized to the pad. */
     private void drawChip(Canvas canvas, String word, RectF area, float size, float radius) {
         float textSize = Math.max(7 * density, Math.min(12 * density, size * .14f));
         text.setTextSize(textSize);
         float pad = textSize * .7f, w = text.measureText(word) + 2 * pad, h = textSize * 1.75f;
         float inset = Math.max(4 * density, Math.min(radius * .45f, size * .14f));
         rect.set(area.left + inset, area.top + inset, area.left + inset + w, area.top + inset + h);
-        fill.setColor(alpha(accent, .22f));
+        fill.setColor(alpha(accent, .24f));
         canvas.drawRoundRect(rect, h / 2, h / 2, fill);
         stroke.setStrokeWidth(density);
-        stroke.setColor(alpha(accent, .6f));
+        stroke.setColor(alpha(highlightColor, .68f));
         canvas.drawRoundRect(rect, h / 2, h / 2, stroke);
-        label(canvas, word, rect.centerX(), rect.centerY(), textSize, accent);
+        label(canvas, word, rect.centerX(), rect.centerY(), textSize, highlightColor);
     }
 
-    /** The finger's last places as amber strokes, thinner and fainter the older they are, gone after {@link #TRAIL_MS}. */
     private void drawTrail(Canvas canvas, float left, float top, float width, float height, State state) {
         if (state.trailCount < 2) return;
         for (int i = 1; i < state.trailCount; i++) {
@@ -1045,13 +1071,12 @@ final class PadPainter {
             if (age >= TRAIL_MS) continue;
             float fade = 1 - age / (float) TRAIL_MS, along = i / (float) (state.trailCount - 1);
             trail.setStrokeWidth((1.5f + 3.5f * along) * density);
-            trail.setColor(alpha(accent, .7f * fade * (.3f + .7f * along)));
+            trail.setColor(alpha(blend(accent, highlightColor, along), .75f * fade * (.3f + .7f * along)));
             canvas.drawLine(left + Math.max(0, Math.min(width, state.trailX[from])), top + Math.max(0, Math.min(height, state.trailY[from])),
                     left + Math.max(0, Math.min(width, state.trailX[to])), top + Math.max(0, Math.min(height, state.trailY[to])), trail);
         }
     }
 
-    /** A round button filling its box: a disc in a square one, an oval in a resized one, its mark in the middle. */
     private void drawRound(Canvas canvas, PadLayout.Control control, float left, float top, float width, float height,
                            State state) {
         float level = state.press[0], edge = EDGE_DP * density;
@@ -1059,31 +1084,29 @@ final class PadPainter {
         float rx = width / 2 - edge, ry = height / 2 - edge;
         disc(canvas, cx, cy, rx, ry, level, SHADOW_REACH_DP * density);
         float r = Math.min(rx, ry) - PRESS_IN_DP * density * level;
-        int color = blend(LABEL, onAccent, level);
+        int pressedFg = com.limelight.ui.PortalBackgroundHelper.isRobolectric() ? onAccent : highlightColor;
+        int color = blend(labelColor, pressedFg, level);
         float g = r * .42f;
         stroke.setColor(color);
         stroke.setStrokeWidth(1.75f * density);
         switch (control) {
             case SELECT: {
-                // View: two overlapping windows.
                 float w = g * 1.1f, h = g * .85f, o = g * .35f;
                 rect.set(cx - w / 2 - o, cy - h / 2 - o, cx + w / 2 - o, cy + h / 2 - o);
                 canvas.drawRoundRect(rect, g * .15f, g * .15f, stroke);
                 rect.offset(2 * o, 2 * o);
-                fill.setColor(blend(0xFF22262E, accent, level));
+                fill.setColor(blend(glassHeldFill | 0xFF000000, glassPressedFill, level));
                 canvas.drawRoundRect(rect, g * .15f, g * .15f, fill);
                 canvas.drawRoundRect(rect, g * .15f, g * .15f, stroke);
                 break;
             }
             case START: {
-                // Menu: three lines.
                 for (int i = -1; i <= 1; i++) {
                     canvas.drawLine(cx - g * .75f, cy + i * g * .5f, cx + g * .75f, cy + i * g * .5f, stroke);
                 }
                 break;
             }
             case HOME: {
-                // Home: a house.
                 path.reset();
                 path.moveTo(cx - g * .8f, cy - g * .05f);
                 path.lineTo(cx, cy - g * .8f);

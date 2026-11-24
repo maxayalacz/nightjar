@@ -104,6 +104,9 @@ public final class OneUiThemeApplier {
         if (view instanceof PcRow) {
             ((PcRow) view).refreshTheme(psv);
         }
+        if (view instanceof PcCardSurface) {
+            ((PcCardSurface) view).refreshTheme(psv);
+        }
         if (view.getId() == R.id.home_setup_card && !(view instanceof GlassSurface)) {
             applyFrostedCard(view, psv, FlowingAuroraView.CornerMode.ALL, 20f);
         }
@@ -128,8 +131,19 @@ public final class OneUiThemeApplier {
                     new int[]{(0x78 << 24) | (palette.accent & 0x00FFFFFF), (0x44 << 24) | (palette.secondaryText & 0x00FFFFFF)});
             sw.setThumbTintList(thumb);
             sw.setTrackTintList(track);
+            if (sw instanceof com.google.android.material.materialswitch.MaterialSwitch) {
+                ((com.google.android.material.materialswitch.MaterialSwitch) sw).setTrackDecorationTintList(
+                        new ColorStateList(
+                                new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
+                                new int[]{palette.highlight, (0x66 << 24) | (palette.secondaryText & 0x00FFFFFF)}));
+            }
         } else if (view instanceof CompoundButton) {
             CompoundButton cb = (CompoundButton) view;
+            if (cb instanceof com.google.android.material.radiobutton.MaterialRadioButton) {
+                ((com.google.android.material.radiobutton.MaterialRadioButton) cb).setUseMaterialThemeColors(false);
+            } else if (cb instanceof com.google.android.material.checkbox.MaterialCheckBox) {
+                ((com.google.android.material.checkbox.MaterialCheckBox) cb).setUseMaterialThemeColors(false);
+            }
             ColorStateList tint = new ColorStateList(
                     new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
                     new int[]{palette.accent, palette.secondaryText});

@@ -78,15 +78,20 @@ final class PadEditor extends FrameLayout {
     private boolean perGame;
     private PadLayout.Control selected;
     private final Surface surface;
-    private final View panel, controlSection, pointerMode, mouseCard, cameraCard, thisGame;
+    private final View panel, collapsedBar, gripView, scrollView, actionsView,
+            controlSection, pointerMode, mouseCard, cameraCard, thisGame;
+    private final TextView collapsedTitle;
     private final LinearLayout layoutSection, options;
     /** The Add groups side by side, for measuring whether they fit beside the options. */
     private TileFlow groups;
     private final LinearLayout addSection;
     private final TextView selection, sizeText, hint;
     private final MaterialButton hide, reset, split, join;
-    private final Chip glyphs;
+    private final Chip presetChip, glyphs;
     private boolean compactButtons, shortSurface;
+    private boolean collapsed;
+    private int expandedWidth;
+    private final int basePadStart, basePadEnd, basePadBottom;
     private final Slider opacity;
     private final float density;
     private boolean settingOpacity;
@@ -100,6 +105,7 @@ final class PadEditor extends FrameLayout {
      */
     private boolean panelPlaced;
     private float panelX, panelY, gripRawX, gripRawY, gripFromX, gripFromY;
+    private boolean collapsedDragged;
     /** Once a change of the panel has played, it moves out of the picked control's way with its final size. */
     private final Transition.TransitionListener settled = new Transition.TransitionListener() {
         @Override public void onTransitionEnd(Transition transition) {
@@ -125,16 +131,30 @@ final class PadEditor extends FrameLayout {
         this.draft = draft;
         this.perGame = perGame && gameAvailable;
         this.gameAvailable = gameAvailable;
+        this.collapsed = !com.limelight.ui.PortalBackgroundHelper.isRobolectric();
         density = context.getResources().getDisplayMetrics().density;
         surface = new Surface(context);
         addView(surface, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         panel = LayoutInflater.from(context).inflate(R.layout.pad_editor_panel, this, false);
-        // The stream's glass for a modal panel without a blur: its text never sits on a control or the game.
-        float corner = 16 * context.getResources().getDisplayMetrics().density;
-        panel.setBackground(com.limelight.ui.GlassPanelDrawable.stream(context,
-                new float[] {corner, corner, corner, corner, corner, corner, corner, corner}));
-        addView(panel, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER));
-        panel.findViewById(R.id.pad_editor_grip).setOnTouchListener((grip, event) -> dragPanel(event));
+        basePadStart = panel.getPaddingStart();
+        basePadEnd = panel.getPaddingEnd();
+        basePadBottom = panel.getPaddingBottom();
+        panel.setBackground(new FrostedEditorPanelDrawable());
+        LayoutParams initParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT,
+                collapsed ? (Gravity.TOP | Gravity.CENTER_HORIZONTAL) : Gravity.CENTER);
+        if (collapsed) {
+            initParams.topMargin = Math.round(16 * density);
+        }
+        addView(panel, initParams);
+
+        collapsedBar = panel.findViewById(R.id.pad_editor_collapsed_bar);
+        collapsedTitle = panel.findViewById(R.id.pad_editor_collapsed_title);
+        gripView = panel.findViewById(R.id.pad_editor_grip);
+        scrollView = panel.findViewById(R.id.pad_editor_scroll);
+        actionsView = panel.findViewById(R.id.pad_editor_actions);
+
+        gripView.setOnTouchListener((grip, event) -> dragPanel(event));
+        collapsedBar.setOnTouchListener((v, event) -> handleCollapsedTouch(event));
         // A panel that grows or shrinks (the picked control's rows), or a surface that turns or folds, keeps a
         // placed panel whole on the surface.
         panel.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> showPlacedPanel());
@@ -148,8 +168,8 @@ final class PadEditor extends FrameLayout {
         options = panel.findViewById(R.id.pad_editor_options);
         hide = panel.findViewById(R.id.pad_editor_hide);
         reset = panel.findViewById(R.id.pad_editor_reset);
-        Chip preset = panel.findViewById(R.id.pad_editor_preset);
-        preset.setOnClickListener(v -> choosePreset());
+        presetChip = panel.findViewById(R.id.pad_editor_preset);
+        presetChip.setOnClickListener(v -> choosePreset());
         glyphs = panel.findViewById(R.id.pad_editor_glyphs);
         glyphs.setContentDescription(getContext().getString(R.string.pad_edit_glyphs));
         glyphs.setOnClickListener(v -> chooseGlyphs());
@@ -186,6 +206,8 @@ final class PadEditor extends FrameLayout {
             if (fromUser && !settingOpacity) setOpacity(Math.round(value));
         });
         setClickable(true);
+        applyCollapsedVisibility();
+        applyThemeToPanel();
         updatePanel();
         if (transitions) {
             // The dimmed surface and the panel come in quickly rather than at once.
@@ -198,6 +220,133 @@ final class PadEditor extends FrameLayout {
         }
     }
 
+    private void applyCollapsedVisibility() {
+        if (collapsed) {
+            collapsedBar.setVisibility(VISIBLE);
+            gripView.setVisibility(GONE);
+            scrollView.setVisibility(GONE);
+            actionsView.setVisibility(GONE);
+            int hp = Math.round(14 * density);
+            panel.setPaddingRelative(hp, 0, hp, 0);
+        } else {
+            collapsedBar.setVisibility(GONE);
+            gripView.setVisibility(VISIBLE);
+            scrollView.setVisibility(VISIBLE);
+            actionsView.setVisibility(VISIBLE);
+            panel.setPaddingRelative(basePadStart, panel.getPaddingTop(), basePadEnd, basePadBottom);
+        }
+        panel.invalidate();
+    }
+
+    /** Expands the floating editor window on touch; stays expanded until the editor window is closed. */
+    void expandPanel() {
+        if (!collapsed) return;
+        transition();
+        collapsed = false;
+        applyCollapsedVisibility();
+        LayoutParams params = (LayoutParams) panel.getLayoutParams();
+        int targetW = expandedWidth > 0 ? expandedWidth
+                : Math.round(Math.min(PANEL_WIDTH_DP * density, Math.max(240 * density, getWidth() - 2 * PANEL_MARGIN_DP * density)));
+        params.width = Math.max(0, targetW);
+        if (!panelPlaced) {
+            params.gravity = Gravity.CENTER;
+            params.leftMargin = params.topMargin = params.rightMargin = params.bottomMargin = 0;
+        }
+        updatePanel();
+        panel.setLayoutParams(params);
+        post(() -> {
+            if (panelPlaced) showPlacedPanel();
+            else keepPanelClear();
+        });
+    }
+
+    private boolean handleCollapsedTouch(MotionEvent event) {
+        if (!collapsed) return false;
+        float slop = 10 * density;
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                collapsedDragged = false;
+                gripRawX = event.getRawX();
+                gripRawY = event.getRawY();
+                gripFromX = panel.getX();
+                gripFromY = panel.getY();
+                return true;
+            case MotionEvent.ACTION_MOVE:
+                float dx = event.getRawX() - gripRawX;
+                float dy = event.getRawY() - gripRawY;
+                if (collapsedDragged || Math.hypot(dx, dy) > slop) {
+                    collapsedDragged = true;
+                    placePanel(gripFromX + dx, gripFromY + dy);
+                }
+                return true;
+            case MotionEvent.ACTION_UP:
+                if (collapsedDragged) {
+                    if (panelPlaced) controller.savePanelPosition(Math.round(panelX), Math.round(panelY));
+                } else {
+                    expandPanel();
+                }
+                return true;
+            case MotionEvent.ACTION_CANCEL:
+                if (collapsedDragged && panelPlaced) {
+                    controller.savePanelPosition(Math.round(panelX), Math.round(panelY));
+                }
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /** Live One UI frosted card background for the floating editor window (pill when collapsed, squircle when expanded). */
+    private final class FrostedEditorPanelDrawable extends android.graphics.drawable.Drawable {
+        private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint rimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Path clipPath = new android.graphics.Path();
+        private final RectF boundsF = new RectF();
+        private final RectF rimBounds = new RectF();
+
+        FrostedEditorPanelDrawable() {
+            rimPaint.setStyle(Paint.Style.STROKE);
+        }
+
+        @Override
+        public void draw(Canvas canvas) {
+            android.graphics.Rect b = getBounds();
+            if (b.isEmpty()) return;
+            boundsF.set(b);
+            float r = collapsed ? (boundsF.height() * 0.5f) : (22f * density);
+            clipPath.reset();
+            clipPath.addRoundRect(boundsF, r, r, android.graphics.Path.Direction.CW);
+
+            Context ctx = getContext();
+            com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(ctx);
+            boolean drewBlur = controller.blurHelper() != null
+                    && controller.blurHelper().drawCardBlurForBounds(canvas, panel, clipPath, boundsF, 1f);
+            fillPaint.setColor(drewBlur ? palette.getDialogOverlayTint() : palette.getDialogSurfaceColor(false));
+            canvas.drawPath(clipPath, fillPaint);
+
+            float outlineScale = com.limelight.ui.PortalBackgroundHelper.isRobolectric()
+                    ? 1f
+                    : Math.max(0f, com.limelight.preferences.PreferenceConfiguration.readPreferences(ctx).cardOutlineThicknessPercent / 100f);
+            float strokePx = outlineScale <= 0.01f ? 0f : Math.max(1f, density * 1.15f * outlineScale);
+            if (strokePx > 0f) {
+                rimPaint.setStrokeWidth(strokePx);
+                rimPaint.setColor(collapsed ? ((0xCC << 24) | (palette.highlight & 0x00FFFFFF)) : palette.getCardRimColor());
+                rimBounds.set(boundsF);
+                rimBounds.inset(strokePx * 0.5f, strokePx * 0.5f);
+                canvas.drawRoundRect(rimBounds, Math.max(0f, r - strokePx * 0.5f), Math.max(0f, r - strokePx * 0.5f), rimPaint);
+            }
+        }
+
+        @Override public void setAlpha(int alpha) { }
+        @Override public void setColorFilter(android.graphics.ColorFilter colorFilter) { }
+        @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
+    }
+
+    void invalidateBlurTargets() {
+        surface.invalidate();
+        panel.invalidate();
+    }
+
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
@@ -208,15 +357,18 @@ final class PadEditor extends FrameLayout {
                 w - 2 * PANEL_MARGIN_DP * density));
         // A narrow panel shows Reset as its icon so Cancel and Done stay on the row.
         boolean narrow = width < PANEL_WIDTH_DP * density;
+        expandedWidth = Math.max(0, width);
         LayoutParams params = (LayoutParams) panel.getLayoutParams();
-        if (params.width != width || narrow != compactButtons || shortSurface != this.shortSurface) {
-            params.width = Math.max(0, width);
+        int desiredWidth = collapsed ? LayoutParams.WRAP_CONTENT : expandedWidth;
+        if (params.width != desiredWidth || narrow != compactButtons || shortSurface != this.shortSurface) {
+            params.width = desiredWidth;
             post(() -> {
                 compactButtons = narrow;
                 this.shortSurface = shortSurface;
                 updatePanel();
+                params.width = collapsed ? LayoutParams.WRAP_CONTENT : expandedWidth;
                 panel.setLayoutParams(params);
-                keepPanelClear();
+                if (!collapsed) keepPanelClear();
             });
         }
         if (oldw != 0 && oldh != 0 && (w > h) != (oldw > oldh)) {
@@ -241,7 +393,8 @@ final class PadEditor extends FrameLayout {
      */
     private void arrangeLayout() {
         int margin = Math.round(12 * density);
-        int content = ((LayoutParams) panel.getLayoutParams()).width - panel.getPaddingStart() - panel.getPaddingEnd();
+        int baseW = collapsed ? expandedWidth : ((LayoutParams) panel.getLayoutParams()).width;
+        int content = baseW - basePadStart - basePadEnd;
         boolean beside = false;
         if (shortSurface && content > 0 && addSection.getVisibility() == VISIBLE && groups != null) {
             int any = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
@@ -574,12 +727,176 @@ final class PadEditor extends FrameLayout {
         return draft.spec(PadLayout.Control.L3);
     }
 
+    private void applyThemeToPanel() {
+        Context ctx = getContext();
+        com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(ctx);
+        int primary = palette.getPrimaryTextColor();
+        int secondary = palette.getSecondaryTextColor();
+        int accent = palette.getNeonAccent();
+        int highlight = palette.highlight;
+        int rim = palette.getCardRimColor();
+        int onAccent = androidx.core.graphics.ColorUtils.calculateLuminance(accent) > 0.45 ? 0xFF0B0E14 : 0xFFFFFFFF;
+        android.content.res.ColorStateList ripple = android.content.res.ColorStateList.valueOf(
+                (0x38 << 24) | (accent & 0x00FFFFFF));
+
+        View cIcon = panel.findViewById(R.id.pad_editor_collapsed_icon);
+        if (cIcon instanceof android.widget.ImageView) {
+            ((android.widget.ImageView) cIcon).setImageTintList(android.content.res.ColorStateList.valueOf(highlight));
+        }
+        if (collapsedTitle != null) {
+            collapsedTitle.setTextColor(primary);
+        }
+        View cChev = panel.findViewById(R.id.pad_editor_collapsed_chevron);
+        if (cChev instanceof android.widget.ImageView) {
+            ((android.widget.ImageView) cChev).setImageTintList(android.content.res.ColorStateList.valueOf(secondary));
+        }
+
+        View gripBar = panel.findViewById(R.id.pad_editor_grip_bar);
+        if (gripBar != null) {
+            android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+            gd.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            gd.setCornerRadius(4 * density);
+            gd.setColor((0x99 << 24) | (secondary & 0x00FFFFFF));
+            gripBar.setBackground(gd);
+        }
+
+        selection.setTextColor(primary);
+        sizeText.setTextColor(primary);
+        hint.setTextColor(secondary);
+
+        View opacityParent = (View) opacity.getParent();
+        if (opacityParent instanceof ViewGroup && ((ViewGroup) opacityParent).getChildCount() > 0) {
+            View opLabel = ((ViewGroup) opacityParent).getChildAt(0);
+            if (opLabel instanceof TextView) {
+                ((TextView) opLabel).setTextColor(secondary);
+            }
+        }
+
+        for (int id : new int[]{R.id.pad_editor_smaller, R.id.pad_editor_larger}) {
+            View btn = panel.findViewById(id);
+            if (btn instanceof MaterialButton) {
+                MaterialButton mb = (MaterialButton) btn;
+                mb.setIconTint(android.content.res.ColorStateList.valueOf(primary));
+                mb.setRippleColor(ripple);
+            }
+        }
+
+        opacity.setThumbTintList(android.content.res.ColorStateList.valueOf(highlight));
+        opacity.setTrackActiveTintList(android.content.res.ColorStateList.valueOf(accent));
+        opacity.setTrackInactiveTintList(android.content.res.ColorStateList.valueOf(
+                (0x44 << 24) | (secondary & 0x00FFFFFF)));
+        opacity.setHaloTintList(android.content.res.ColorStateList.valueOf(
+                (0x44 << 24) | (accent & 0x00FFFFFF)));
+
+        for (MaterialButton tonal : new MaterialButton[]{split, join, hide}) {
+            tonal.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                    (0x38 << 24) | (accent & 0x00FFFFFF)));
+            tonal.setStrokeColor(android.content.res.ColorStateList.valueOf(rim));
+            tonal.setStrokeWidth(Math.max(1, Math.round(density)));
+            tonal.setTextColor(highlight);
+            tonal.setIconTint(android.content.res.ColorStateList.valueOf(highlight));
+            tonal.setRippleColor(ripple);
+        }
+
+        stylePointerCard(mouseCard, palette);
+        stylePointerCard(cameraCard, palette);
+
+        for (Chip chip : new Chip[]{presetChip, glyphs}) {
+            chip.setChipBackgroundColor(android.content.res.ColorStateList.valueOf(
+                    (0x36 << 24) | (palette.surface & 0x00FFFFFF)));
+            chip.setChipStrokeColor(android.content.res.ColorStateList.valueOf(rim));
+            chip.setChipStrokeWidth(Math.max(1f, density));
+            chip.setChipIconTint(android.content.res.ColorStateList.valueOf(highlight));
+            chip.setTextColor(primary);
+            chip.setRippleColor(ripple);
+        }
+
+        if (thisGame instanceof MaterialSwitch) {
+            MaterialSwitch ms = (MaterialSwitch) thisGame;
+            ms.setTextColor(primary);
+            ms.setThumbTintList(new android.content.res.ColorStateList(
+                    new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
+                    new int[]{highlight, secondary}));
+            ms.setTrackTintList(new android.content.res.ColorStateList(
+                    new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
+                    new int[]{(0x80 << 24) | (accent & 0x00FFFFFF), (0x44 << 24) | (secondary & 0x00FFFFFF)}));
+            ms.setTrackDecorationTintList(new android.content.res.ColorStateList(
+                    new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
+                    new int[]{highlight, (0x66 << 24) | (secondary & 0x00FFFFFF)}));
+        }
+
+        View cancelBtn = panel.findViewById(R.id.pad_editor_cancel);
+        for (View v : new View[]{reset, cancelBtn}) {
+            if (v instanceof MaterialButton) {
+                MaterialButton mb = (MaterialButton) v;
+                mb.setTextColor(secondary);
+                mb.setIconTint(android.content.res.ColorStateList.valueOf(secondary));
+                mb.setRippleColor(ripple);
+            }
+        }
+        View doneBtn = panel.findViewById(R.id.pad_editor_done);
+        if (doneBtn instanceof MaterialButton) {
+            MaterialButton done = (MaterialButton) doneBtn;
+            done.setBackgroundTintList(android.content.res.ColorStateList.valueOf(accent));
+            done.setTextColor(onAccent);
+            done.setRippleColor(android.content.res.ColorStateList.valueOf(0x33FFFFFF));
+        }
+    }
+
+    private void stylePointerCard(View card, com.limelight.ui.AppThemePalette palette) {
+        if (!(card instanceof ViewGroup)) return;
+        float r = 14f * density;
+        int stroke = Math.max(1, Math.round(density * 1.15f));
+
+        android.graphics.drawable.GradientDrawable selBg = new android.graphics.drawable.GradientDrawable();
+        selBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        selBg.setCornerRadius(r);
+        selBg.setColor((0x42 << 24) | (palette.accent & 0x00FFFFFF));
+        selBg.setStroke(stroke, palette.highlight);
+
+        android.graphics.drawable.GradientDrawable normBg = new android.graphics.drawable.GradientDrawable();
+        normBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        normBg.setCornerRadius(r);
+        normBg.setColor((0x2C << 24) | (palette.surface & 0x00FFFFFF));
+        normBg.setStroke(Math.max(1, Math.round(density)), palette.getCardRimColor());
+
+        android.graphics.drawable.StateListDrawable sld = new android.graphics.drawable.StateListDrawable();
+        sld.addState(new int[]{android.R.attr.state_selected}, selBg);
+        sld.addState(new int[]{}, normBg);
+        card.setBackground(sld);
+
+        int[][] states = new int[][]{new int[]{android.R.attr.state_selected}, new int[]{}};
+        android.content.res.ColorStateList activeList = new android.content.res.ColorStateList(
+                states, new int[]{palette.highlight, palette.getPrimaryTextColor()});
+
+        ViewGroup vg = (ViewGroup) card;
+        for (int i = 0; i < vg.getChildCount(); i++) {
+            View c = vg.getChildAt(i);
+            if (c instanceof android.widget.ImageView) {
+                ((android.widget.ImageView) c).setImageTintList(activeList);
+            } else if (c instanceof ViewGroup) {
+                ViewGroup col = (ViewGroup) c;
+                if (col.getChildCount() > 0 && col.getChildAt(0) instanceof TextView) {
+                    ((TextView) col.getChildAt(0)).setTextColor(activeList);
+                }
+                if (col.getChildCount() > 1 && col.getChildAt(1) instanceof TextView) {
+                    ((TextView) col.getChildAt(1)).setTextColor(palette.getSecondaryTextColor());
+                }
+            }
+        }
+    }
+
     private void updatePanel() {
         PadLayout.Spec spec = reference();
         String name = selected == null ? getContext().getString(R.string.pad_edit_all) :
                 name(getContext(), selected, draft.glyph());
         if (selected != null && spec.hidden) name = getContext().getString(R.string.pad_edit_hidden, name);
         selection.setText(name);
+        if (collapsedTitle != null) {
+            collapsedTitle.setText(selected == null
+                    ? getContext().getString(R.string.pad_editor_collapsed_pill)
+                    : name);
+        }
         sizeText.setText(sizeLabel(spec));
         settingOpacity = true;
         opacity.setValue(Math.max(PadLayout.MIN_OPACITY, Math.min(PadLayout.MAX_OPACITY, Math.round(spec.opacity / 5f) * 5)));
@@ -627,7 +944,9 @@ final class PadEditor extends FrameLayout {
         groups = null;
         addSection.setVisibility(out.isEmpty() ? GONE : VISIBLE);
         if (out.isEmpty()) return;
-        addSection.addView(heading(R.string.pad_edit_add, R.style.TextAppearance_Nightjar_Label, R.color.night_on_surface));
+        com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(getContext());
+        addSection.addView(headingThemed(R.string.pad_edit_add, R.style.TextAppearance_Nightjar_Label,
+                palette.getPrimaryTextColor()));
         // Each group its name over its tiles; the groups side by side as far as the panel is wide.
         int gap = Math.round(TILE_GAP_DP * density);
         groups = new TileFlow(getContext(), Math.round(GROUP_GAP_DP * density), gap);
@@ -640,8 +959,8 @@ final class PadEditor extends FrameLayout {
                 if (flow == null) {
                     LinearLayout block = new LinearLayout(getContext());
                     block.setOrientation(LinearLayout.VERTICAL);
-                    block.addView(heading(groupName(group), R.style.TextAppearance_Nightjar_Caption,
-                            R.color.night_on_surface_variant));
+                    block.addView(headingThemed(groupName(group), R.style.TextAppearance_Nightjar_Caption,
+                            palette.getSecondaryTextColor()));
                     flow = new TileFlow(getContext(), gap, gap);
                     block.addView(flow);
                     groups.addView(block);
@@ -653,10 +972,10 @@ final class PadEditor extends FrameLayout {
         }
     }
 
-    private TextView heading(int text, int appearance, int color) {
+    private TextView headingThemed(int text, int appearance, int colorInt) {
         TextView view = new TextView(getContext());
         TextViewCompat.setTextAppearance(view, appearance);
-        view.setTextColor(ContextCompat.getColor(getContext(), color));
+        view.setTextColor(colorInt);
         view.setText(text);
         view.setPadding(0, Math.round(6 * density), 0, Math.round(4 * density));
         return view;
@@ -733,7 +1052,7 @@ final class PadEditor extends FrameLayout {
 
     /** Moves the panel to the other half when the picked control sits under it, until the player places it. */
     private void keepPanelClear() {
-        if (selected == null || panel.getWidth() == 0 || panelPlaced) return;
+        if (collapsed || selected == null || panel.getWidth() == 0 || panelPlaced) return;
         float[] box = draft.bounds(selected, getWidth(), getHeight(), density, new float[4]);
         RectF control = new RectF(box[0], box[1], box[0] + box[2], box[1] + box[3]);
         RectF under = new RectF(panel.getLeft(), panel.getTop(), panel.getRight(), panel.getBottom());
@@ -804,20 +1123,33 @@ final class PadEditor extends FrameLayout {
         Tile(Context context, PadLayout.Control control) {
             super(context);
             this.control = control;
-            setBackgroundResource(R.drawable.bg_pad_editor_tile);
+            com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(context);
+            android.graphics.drawable.GradientDrawable tileBg = new android.graphics.drawable.GradientDrawable();
+            tileBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            tileBg.setCornerRadius(12f * density);
+            tileBg.setColor((0x2C << 24) | (palette.surface & 0x00FFFFFF));
+            tileBg.setStroke(Math.max(1, Math.round(density)), palette.getCardRimColor());
+            android.graphics.drawable.GradientDrawable mask = new android.graphics.drawable.GradientDrawable();
+            mask.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            mask.setCornerRadius(12f * density);
+            mask.setColor(0xFFFFFFFF);
+            setBackground(new android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf((0x38 << 24) | (palette.accent & 0x00FFFFFF)),
+                    tileBg, mask));
             setFocusable(true);
             setClickable(true);
             setOnClickListener(v -> add(control));
             caption.setTextAlign(Paint.Align.CENTER);
             captionSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 11, getResources().getDisplayMetrics());
             caption.setTextSize(captionSize);
-            caption.setColor(ContextCompat.getColor(context, R.color.night_on_surface));
+            caption.setColor(palette.getPrimaryTextColor());
             refresh();
         }
 
         /** Its name follows the glyph set (a face button's letter), its drawing that and the touchpad's mode. */
         void refresh() {
             name = name(getContext(), control, draft.glyph());
+            caption.setColor(com.limelight.ui.AppThemePalette.getCurrent(getContext()).getPrimaryTextColor());
             setContentDescription(getContext().getString(R.string.pad_edit_add_control, name));
             invalidate();
         }
@@ -920,10 +1252,10 @@ final class PadEditor extends FrameLayout {
 
         Surface(Context context) {
             super(context);
-            scrim.setColor(0x99000000);
+            scrim.setColor(com.limelight.ui.PortalBackgroundHelper.isRobolectric() ? 0x99000000 : 0x4D000000);
             grid.setColor(0x14FFFFFF);
             grid.setStrokeWidth(Math.max(1, density));
-            guide.setColor(painter.accent());
+            guide.setColor(painter.highlight());
             guide.setStrokeWidth(Math.max(1, density));
         }
 
@@ -934,18 +1266,24 @@ final class PadEditor extends FrameLayout {
             float step = GRID_DP * 3 * density;
             for (float x = step; x < width; x += step) canvas.drawLine(x, 0, x, height, grid);
             for (float y = step; y < height; y += step) canvas.drawLine(0, y, width, y, grid);
+            guide.setColor(painter.highlight());
             float base = controller.prefs().oscOpacity / 100f;
-            for (PadLayout.Control control : PadLayout.Control.values()) {
-                if (!onSurface(control)) continue;
-                PadLayout.Spec spec = draft.spec(control);
-                draft.bounds(control, width, height, density, box);
-                // Show the real opacity, but never so faint that a control cannot be found.
-                float alpha = Math.max(.35f, base * spec.opacity / 100f);
-                int saved = canvas.saveLayerAlpha(box[0], box[1], box[0] + box[2], box[1] + box[3],
-                        Math.round(alpha * 255));
-                painter.draw(canvas, control, box[0], box[1], box[2], box[3], previewState(control));
-                canvas.restoreToCount(saved);
-                painter.drawOutline(canvas, box[0], box[1], box[2], box[3], control == selected);
+            painter.bindBlurView(this, controller.blurHelper());
+            try {
+                for (PadLayout.Control control : PadLayout.Control.values()) {
+                    if (!onSurface(control)) continue;
+                    PadLayout.Spec spec = draft.spec(control);
+                    draft.bounds(control, width, height, density, box);
+                    // Show the real opacity, but never so faint that a control cannot be found.
+                    float alpha = Math.max(.35f, base * spec.opacity / 100f);
+                    int saved = canvas.saveLayerAlpha(box[0], box[1], box[0] + box[2], box[1] + box[3],
+                            Math.round(alpha * 255));
+                    painter.draw(canvas, control, box[0], box[1], box[2], box[3], previewState(control));
+                    canvas.restoreToCount(saved);
+                    painter.drawOutline(canvas, box[0], box[1], box[2], box[3], control == selected);
+                }
+            } finally {
+                painter.clearBlurView();
             }
             for (int i = 0; i < guidesX; i++) canvas.drawLine(guideX[i], 0, guideX[i], height, guide);
             for (int i = 0; i < guidesY; i++) canvas.drawLine(0, guideY[i], width, guideY[i], guide);

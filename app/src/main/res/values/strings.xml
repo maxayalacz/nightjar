@@ -640,11 +640,14 @@
 
     <!-- On-Screen Controller Engine, Layout Editor & Live Blur -->
     <string name="title_osc_engine">On-screen controller engine</string>
-    <string name="summary_osc_engine">Choose between Moonlight\'s customizable OSC layout editor or Nightjar\'s built-in PadEditor</string>
-    <string name="title_edit_osc_layout">Edit on-screen controller layout</string>
-    <string name="summary_edit_osc_layout">Customize button positions, sizes, snapping, and visibility</string>
+    <string name="summary_osc_engine">Choose between Moonlight\'s customizable OSC or Nightjar\'s Modern OSC</string>
+    <string name="title_edit_osc_layout">Edit Moonlight controller layout</string>
+    <string name="summary_edit_osc_layout">Customize Moonlight OSC button positions, sizes, snapping, and visibility</string>
+    <string name="title_edit_nightjar_osc_layout">Edit Nightjar controller layout</string>
+    <string name="summary_edit_nightjar_osc_layout">Customize Nightjar OSC buttons, split clusters, WASD, and touchpad</string>
+    <string name="pad_editor_collapsed_pill">Controls Editor</string>
     <string name="title_osc_live_blur">On-screen controller live blur</string>
-    <string name="summary_osc_live_blur">Blur the live game stream behind Moonlight on-screen controller buttons</string>
+    <string name="summary_osc_live_blur">Blur the live game stream behind on-screen controller buttons</string>
     <string name="configuration_mode_disable_enable_buttons">Tap buttons to hide or show them</string>
     <string name="configuration_mode_move_buttons">Drag buttons to move them</string>
     <string name="configuration_mode_resize_buttons">Drag buttons to resize them</string>

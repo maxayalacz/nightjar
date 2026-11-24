@@ -66,7 +66,7 @@ public class SettingsKeysTest {
     // Rows that open a screen or a dialog and store nothing under their key.
     private static final Set<String> ACTIONS = new HashSet<>(Arrays.asList(
             "gpu_driver", "keyboard_shortcuts_editor", "stream_hotkeys", "controller_button_mapping",
-            "controller_test", "gyro_mapping_profiles", "stream_profiles", "reset_osc", "check_updates_now", "help", "latency_benchmark", "report_problem", "about_app", "reset_all", "export_latency_csv", "theme_studio", "edit_osc_layout",
+            "controller_test", "gyro_mapping_profiles", "stream_profiles", "reset_osc", "check_updates_now", "help", "latency_benchmark", "report_problem", "about_app", "reset_all", "export_latency_csv", "theme_studio", "edit_osc_layout", "edit_nightjar_osc_layout",
             "pin_lock", // opens its own screen; the PIN lives in the pin_lock prefs file
             // Open a text box; the keys live in the game_info_keys prefs file, out of presets and exports.
             "game_info_steamgriddb", "game_info_igdb_client_id", "game_info_igdb_client_secret",

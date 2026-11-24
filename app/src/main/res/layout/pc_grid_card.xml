@@ -15,7 +15,7 @@
         android:layout_width="match_parent" android:layout_height="@dimen/tile_height"
         app:cardCornerRadius="@dimen/nj_radius_panel" app:cardPreventCornerOverlap="false"
         app:cardBackgroundColor="@android:color/transparent" android:clipToOutline="true" android:duplicateParentState="true">
-        <FrameLayout android:layout_width="match_parent" android:layout_height="match_parent" android:duplicateParentState="true">
+        <com.limelight.ui.PcCardSurface android:id="@+id/grid_card_surface" android:layout_width="match_parent" android:layout_height="match_parent" android:duplicateParentState="true">
             <LinearLayout android:id="@+id/grid_row" android:layout_width="match_parent" android:layout_height="match_parent"
                 android:orientation="vertical" android:gravity="center_horizontal" android:clipChildren="false" android:clipToPadding="false"
                 android:paddingStart="@dimen/space_l" android:paddingEnd="@dimen/space_l" android:paddingTop="@dimen/tile_pad_top">
@@ -53,7 +53,7 @@
                 android:background="@drawable/pc_more_quiet" android:focusable="false" android:scaleType="center"
                 android:importantForAccessibility="yes" android:src="@drawable/ic_glass_more"
                 android:contentDescription="@string/library_options" app:tint="?attr/colorOnSurfaceVariant" />
-        </FrameLayout>
+        </com.limelight.ui.PcCardSurface>
     </com.google.android.material.card.MaterialCardView>
     <View android:id="@+id/grid_ring" android:layout_width="match_parent" android:layout_height="match_parent"
         android:layout_marginStart="-5dp" android:layout_marginEnd="-5dp" android:layout_marginTop="-5dp" android:layout_marginBottom="-5dp"

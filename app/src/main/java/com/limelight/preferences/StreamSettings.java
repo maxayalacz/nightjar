@@ -380,6 +380,15 @@ public class StreamSettings extends NightjarActivity {
         // section's row is marked once it is there.
         ListView sections = listOf(R.id.settings_sections);
         if (twoPane && sections != null) sections.post(() -> { if (!isFinishing() && !isDestroyed()) markRail(); });
+        View settingsContainer = findViewById(R.id.stream_settings);
+        if (settingsContainer != null && !com.limelight.ui.PortalBackgroundHelper.isRobolectric()) {
+            settingsContainer.post(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                com.limelight.ui.OneUiThemeApplier.applyToActivity(this);
+                GlassHost gh = findViewById(R.id.glass_host);
+                if (gh != null) gh.refreshGlass();
+            });
+        }
     }
 
     /** The preference list of the fragment in a pane, or null while it has no view. */
@@ -3160,6 +3169,14 @@ public class StreamSettings extends NightjarActivity {
             if (editOscPref != null) {
                 editOscPref.setOnPreferenceClickListener(preference -> {
                     Intent intent = new Intent(getActivity(), com.limelight.OscLayoutEditorActivity.class);
+                    startActivity(intent);
+                    return true;
+                });
+            }
+            Preference editNightjarOscPref = findPreference("edit_nightjar_osc_layout");
+            if (editNightjarOscPref != null) {
+                editNightjarOscPref.setOnPreferenceClickListener(preference -> {
+                    Intent intent = new Intent(getActivity(), com.limelight.NightjarOscEditorActivity.class);
                     startActivity(intent);
                     return true;
                 });

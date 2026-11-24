@@ -505,13 +505,63 @@ public class UiHelper {
         int secondaryText = palette.getSecondaryTextColor();
         int accent = palette.getNeonAccent();
         android.content.res.ColorStateList checkTint = new android.content.res.ColorStateList(
-                new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
-                new int[]{accent, secondaryText});
+                new int[][]{
+                        new int[]{android.R.attr.state_checked},
+                        new int[]{android.R.attr.state_activated},
+                        new int[]{android.R.attr.state_selected},
+                        new int[]{}
+                },
+                new int[]{accent, accent, accent, secondaryText});
+        android.content.res.ColorStateList checkedTextTint = new android.content.res.ColorStateList(
+                new int[][]{
+                        new int[]{android.R.attr.state_checked},
+                        new int[]{android.R.attr.state_activated},
+                        new int[]{}
+                },
+                new int[]{palette.highlight, palette.highlight, primaryText});
 
         if (view instanceof android.widget.CheckedTextView) {
             android.widget.CheckedTextView ctv = (android.widget.CheckedTextView) view;
-            ctv.setTextColor(primaryText);
+            ctv.setTextColor(checkedTextTint);
+            ctv.setCheckMarkTintMode(android.graphics.PorterDuff.Mode.SRC_IN);
             ctv.setCheckMarkTintList(checkTint);
+            androidx.core.widget.TextViewCompat.setCompoundDrawableTintMode(ctv, android.graphics.PorterDuff.Mode.SRC_IN);
+            androidx.core.widget.TextViewCompat.setCompoundDrawableTintList(ctv, checkTint);
+
+            android.graphics.drawable.Drawable cm = ctv.getCheckMarkDrawable();
+            if (cm != null) {
+                cm = androidx.core.graphics.drawable.DrawableCompat.wrap(cm.mutate());
+                androidx.core.graphics.drawable.DrawableCompat.setTintMode(cm, android.graphics.PorterDuff.Mode.SRC_IN);
+                androidx.core.graphics.drawable.DrawableCompat.setTintList(cm, checkTint);
+                ctv.setCheckMarkDrawable(cm);
+            }
+            android.graphics.drawable.Drawable[] rel = ctv.getCompoundDrawablesRelative();
+            boolean hasRel = false;
+            for (int i = 0; i < rel.length; i++) {
+                if (rel[i] != null) {
+                    hasRel = true;
+                    rel[i] = androidx.core.graphics.drawable.DrawableCompat.wrap(rel[i].mutate());
+                    androidx.core.graphics.drawable.DrawableCompat.setTintMode(rel[i], android.graphics.PorterDuff.Mode.SRC_IN);
+                    androidx.core.graphics.drawable.DrawableCompat.setTintList(rel[i], checkTint);
+                }
+            }
+            if (hasRel) {
+                ctv.setCompoundDrawablesRelativeWithIntrinsicBounds(rel[0], rel[1], rel[2], rel[3]);
+            } else {
+                android.graphics.drawable.Drawable[] abs = ctv.getCompoundDrawables();
+                boolean hasAbs = false;
+                for (int i = 0; i < abs.length; i++) {
+                    if (abs[i] != null) {
+                        hasAbs = true;
+                        abs[i] = androidx.core.graphics.drawable.DrawableCompat.wrap(abs[i].mutate());
+                        androidx.core.graphics.drawable.DrawableCompat.setTintMode(abs[i], android.graphics.PorterDuff.Mode.SRC_IN);
+                        androidx.core.graphics.drawable.DrawableCompat.setTintList(abs[i], checkTint);
+                    }
+                }
+                if (hasAbs) {
+                    ctv.setCompoundDrawablesWithIntrinsicBounds(abs[0], abs[1], abs[2], abs[3]);
+                }
+            }
         } else if (view instanceof androidx.appcompat.widget.SwitchCompat) {
             androidx.appcompat.widget.SwitchCompat sw = (androidx.appcompat.widget.SwitchCompat) view;
             sw.setTextColor(primaryText);
@@ -521,10 +571,22 @@ public class UiHelper {
             sw.setTrackTintList(new android.content.res.ColorStateList(
                     new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
                     new int[]{(0x78 << 24) | (palette.accent & 0x00FFFFFF), (0x44 << 24) | (secondaryText & 0x00FFFFFF)}));
+            if (sw instanceof com.google.android.material.materialswitch.MaterialSwitch) {
+                ((com.google.android.material.materialswitch.MaterialSwitch) sw).setTrackDecorationTintList(
+                        new android.content.res.ColorStateList(
+                                new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
+                                new int[]{palette.highlight, (0x66 << 24) | (secondaryText & 0x00FFFFFF)}));
+            }
         } else if (view instanceof android.widget.CompoundButton) {
             android.widget.CompoundButton cb = (android.widget.CompoundButton) view;
-            cb.setTextColor(primaryText);
-            cb.setButtonTintList(checkTint);
+            if (cb instanceof com.google.android.material.radiobutton.MaterialRadioButton) {
+                ((com.google.android.material.radiobutton.MaterialRadioButton) cb).setUseMaterialThemeColors(false);
+            } else if (cb instanceof com.google.android.material.checkbox.MaterialCheckBox) {
+                ((com.google.android.material.checkbox.MaterialCheckBox) cb).setUseMaterialThemeColors(false);
+            }
+            cb.setTextColor(checkedTextTint);
+            androidx.core.widget.CompoundButtonCompat.setButtonTintMode(cb, android.graphics.PorterDuff.Mode.SRC_IN);
+            androidx.core.widget.CompoundButtonCompat.setButtonTintList(cb, checkTint);
         } else if (view instanceof com.google.android.material.slider.Slider) {
             com.google.android.material.slider.Slider sl = (com.google.android.material.slider.Slider) view;
             sl.setThumbTintList(android.content.res.ColorStateList.valueOf(palette.highlight));

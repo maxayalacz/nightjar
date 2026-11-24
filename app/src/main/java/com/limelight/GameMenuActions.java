@@ -215,6 +215,9 @@ final class GameMenuActions {
             if (game.moonlightVirtualController != null) {
                 game.moonlightVirtualController.setOpacity(clamped);
             }
+            if (game.modernController != null) {
+                game.modernController.refreshLiveVisuals();
+            }
         }
 
         @Override
@@ -227,20 +230,35 @@ final class GameMenuActions {
             if (game.moonlightVirtualController != null) {
                 game.moonlightVirtualController.refreshLayout();
             }
+            if (game.modernController != null) {
+                game.modernController.refreshLiveVisuals();
+            }
         }
 
         @Override
         public void setOscVibrateLive(boolean enabled) {
             if (game.prefConfig != null) game.prefConfig.vibrateOsc = enabled;
             prefs().edit().putBoolean("checkbox_vibrate_osc", enabled).apply();
+            if (game.modernController != null) {
+                game.modernController.refreshLiveVisuals();
+            }
         }
 
         @Override
         public void setFreeAnalogStickLive(boolean enabled) {
-            if (game.prefConfig != null) game.prefConfig.enableNewAnalogStick = enabled;
-            prefs().edit().putBoolean("checkbox_enable_analog_stick_new", enabled).apply();
+            if (game.prefConfig != null) {
+                game.prefConfig.enableNewAnalogStick = enabled;
+                game.prefConfig.oscFloatingSticks = enabled;
+            }
+            prefs().edit()
+                    .putBoolean("checkbox_enable_analog_stick_new", enabled)
+                    .putString("list_osc_stick_mode", enabled ? "floating" : "fixed")
+                    .apply();
             if (game.moonlightVirtualController != null) {
                 game.moonlightVirtualController.refreshLayout();
+            }
+            if (game.modernController != null) {
+                game.modernController.refreshLiveVisuals();
             }
         }
 
@@ -254,6 +272,9 @@ final class GameMenuActions {
                 game.moonlightVirtualController.getLiveBlurHelper().refreshBlurPreferenceNow();
                 game.moonlightVirtualController.refreshLayout();
             }
+            if (game.modernController != null) {
+                game.modernController.refreshLiveBlurPreferences();
+            }
         }
 
         @Override
@@ -265,6 +286,9 @@ final class GameMenuActions {
                     clamped).apply();
             if (game.moonlightVirtualController != null) {
                 game.moonlightVirtualController.getLiveBlurHelper().refreshBlurPreferenceNow();
+            }
+            if (game.modernController != null) {
+                game.modernController.refreshLiveBlurPreferences();
             }
         }
 
@@ -278,6 +302,9 @@ final class GameMenuActions {
             if (game.moonlightVirtualController != null) {
                 game.moonlightVirtualController.getLiveBlurHelper().refreshBlurPreferenceNow();
             }
+            if (game.modernController != null) {
+                game.modernController.refreshLiveBlurPreferences();
+            }
         }
 
         @Override
@@ -288,6 +315,9 @@ final class GameMenuActions {
                     fps).apply();
             if (game.moonlightVirtualController != null) {
                 game.moonlightVirtualController.getLiveBlurHelper().refreshBlurPreferenceNow();
+            }
+            if (game.modernController != null) {
+                game.modernController.refreshLiveBlurPreferences();
             }
         }
 

@@ -1352,9 +1352,15 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
         touchInput.updateMenuButton();
     }
 
-    /** Launches Moonlight's precision OscLayoutEditorOverlay (identical to Settings editor) over the live stream. */
+    /** Launches the active OSC engine's layout editor (Moonlight OscLayoutEditorOverlay or Nightjar PadEditor) over the live stream. */
     void startInlineOscLayoutEdit() {
         if (externalPresentation != null || streamView == null || !(streamView.getParent() instanceof FrameLayout)) {
+            return;
+        }
+        if (!useMoonlightOsc()) {
+            if (moonlightVirtualController != null) moonlightVirtualController.hide();
+            ensureModernController();
+            modernController.startEditing();
             return;
         }
         FrameLayout root = (FrameLayout) streamView.getParent();
