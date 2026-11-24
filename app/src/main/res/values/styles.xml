@@ -101,6 +101,8 @@
         <!-- No amber tint on raised surfaces: elevation reads through the surface container tones. -->
         <item name="elevationOverlayEnabled">false</item>
         <item name="materialAlertDialogTheme">@style/ThemeOverlay.Nightjar.Dialog</item>
+        <item name="alertDialogTheme">@style/ThemeOverlay.Nightjar.Dialog</item>
+        <item name="android:alertDialogTheme">@style/ThemeOverlay.Nightjar.Dialog</item>
         <item name="toolbarStyle">@style/Widget.Nightjar.Toolbar</item>
         <item name="extendedFloatingActionButtonStyle">@style/Widget.Nightjar.ExtendedFab</item>
         <item name="chipStyle">@style/Widget.Nightjar.Chip</item>
@@ -241,6 +243,8 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="elevationOverlayEnabled">false</item>
         <item name="materialAlertDialogTheme">@style/ThemeOverlay.Nightjar.Dialog</item>
+        <item name="alertDialogTheme">@style/ThemeOverlay.Nightjar.Dialog</item>
+        <item name="android:alertDialogTheme">@style/ThemeOverlay.Nightjar.Dialog</item>
         <item name="toolbarStyle">@style/Widget.Nightjar.Toolbar</item>
         <item name="extendedFloatingActionButtonStyle">@style/Widget.Nightjar.ExtendedFab</item>
         <item name="chipStyle">@style/Widget.Nightjar.Chip</item>
@@ -407,6 +411,14 @@
     </style>
 
     <style name="ThemeOverlay.Nightjar.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <!-- Required for Android 12+ SurfaceFlinger bounded cross-window blur (matches Moonlight OneUI.DialogTheme). -->
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimAmount">0.30</item>
+        <item name="colorSurface">@android:color/transparent</item>
+        <item name="android:colorBackground">@android:color/transparent</item>
+        <item name="android:colorBackgroundFloating">@android:color/transparent</item>
         <!-- Dialog messages are read at arm's length or across a room: Body rather than Supporting. -->
         <item name="textAppearanceBodyMedium">@style/TextAppearance.Nightjar.Body</item>
         <item name="textAppearanceHeadlineSmall">@style/TextAppearance.Nightjar.ScreenTitle</item>

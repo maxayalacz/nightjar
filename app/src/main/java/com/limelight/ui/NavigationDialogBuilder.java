@@ -56,7 +56,14 @@ public final class NavigationDialogBuilder extends MaterialAlertDialogBuilder {
         AlertDialog dialog = super.create();
         // The platform's selector is a grey block, which is no focus language of ours.
         ListView list = dialog.getListView();
-        if (list != null) list.setSelector(R.drawable.dialog_row_focus);
+        if (list != null) {
+            if (PortalBackgroundHelper.isRobolectric()) {
+                list.setSelector(R.drawable.dialog_row_focus);
+            } else {
+                list.setSelector(com.limelight.utils.UiHelper.createThemedRowSelector(
+                        getContext(), AppThemePalette.getCurrent(getContext())));
+            }
+        }
         boolean onSky = ownSurface && !overStream;
         if (dialog.getWindow() != null) {
             if (overStream || onSky) {
@@ -69,8 +76,26 @@ public final class NavigationDialogBuilder extends MaterialAlertDialogBuilder {
         if (onSky) DialogSky.under(dialog);
         // Builds the views now: the buttons exist, and their bar can be laid out for capsules.
         dialog.create();
-        com.limelight.utils.UiHelper.styleDialogSquircle(dialog);
-        styleButtons(dialog);
+        if (!PortalBackgroundHelper.isRobolectric()) {
+            com.limelight.utils.UiHelper.styleDialogSquircle(dialog);
+            styleButtons(dialog);
+            if (dialog.getWindow() != null) {
+                View decor = dialog.getWindow().getDecorView();
+                decor.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                    @Override
+                    public void onViewAttachedToWindow(View v) {
+                        v.removeOnAttachStateChangeListener(this);
+                        com.limelight.utils.UiHelper.styleDialogSquircle(dialog);
+                        styleButtons(dialog);
+                    }
+
+                    @Override
+                    public void onViewDetachedFromWindow(View v) { }
+                });
+            }
+        } else {
+            styleButtons(dialog);
+        }
         DialogInterface.OnKeyListener custom = keyListener;
         DpadEchoFilter dpadEchoes = new DpadEchoFilter();
         dialog.setOnKeyListener((target, key, event) -> {

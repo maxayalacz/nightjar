@@ -394,6 +394,10 @@ final class GameTouchInput {
     }
 
     void setOnscreenControlsEnabled(boolean enabled) {
+        setOnscreenControlsEnabled(enabled, true);
+    }
+
+    void setOnscreenControlsEnabled(boolean enabled, boolean persist) {
         if (!game.conn.canSendInput()) {
             return;
         }
@@ -406,7 +410,9 @@ final class GameTouchInput {
         // The microphone button's default place follows the on-screen controller's top row.
         if (game.micButton != null) game.micButton.place();
         if (game.menuButton != null) game.menuButton.place();
-        DualScreen.saveSettings(game, editor -> editor.putBoolean("checkbox_show_onscreen_controls", enabled));
+        if (persist) {
+            DualScreen.saveSettings(game, editor -> editor.putBoolean("checkbox_show_onscreen_controls", enabled));
+        }
         // Hiding controls changes no layout by itself; ask for one so the overlay can move back.
         game.performanceOverlayScroll.requestLayout();
     }
@@ -443,16 +449,7 @@ final class GameTouchInput {
     void showControllerLayoutDialog() {
         if (game.prefConfig == null
                 || !com.limelight.preferences.PreferenceConfiguration.OSC_ENGINE_NIGHTJAR.equals(game.prefConfig.oscEngine)) {
-            if (!game.prefConfig.onscreenController) {
-                setOnscreenControlsEnabled(true);
-            } else {
-                game.showOnscreenController();
-            }
-            if (game.moonlightVirtualController != null) {
-                game.moonlightVirtualController.setConfigureButtonVisible(true);
-                game.moonlightVirtualController.setControllerMode(
-                        com.limelight.binding.input.virtual_controller.VirtualController.ControllerMode.MoveButtons);
-            }
+            game.startInlineOscLayoutEdit();
             return;
         }
         // A connected gamepad may have kept the controls off the screen; their layout is still editable.

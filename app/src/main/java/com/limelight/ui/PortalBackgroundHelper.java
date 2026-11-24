@@ -46,7 +46,7 @@ public final class PortalBackgroundHelper {
 
     private PortalBackgroundHelper() { }
 
-    static boolean isRobolectric() {
+    public static boolean isRobolectric() {
         return "robolectric".equalsIgnoreCase(Build.FINGERPRINT);
     }
 

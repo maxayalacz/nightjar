@@ -168,8 +168,8 @@ final class GameMenuActions {
                     break;
                 }
             }
-            game.touchInput.applyTouchMode(next, !DualScreen.isSecond(game.getIntent()));
-            DualScreen.mirrorTouchMode(game, next);
+            // Session-only: never overwrite the user's saved default touch mode for future sessions
+            game.touchInput.applyTouchMode(next, false);
             String[] names = game.getResources().getStringArray(R.array.stream_touch_modes);
             if (next >= 0 && next < names.length) {
                 game.messages.alert(names[next], Toast.LENGTH_SHORT);
@@ -183,12 +183,18 @@ final class GameMenuActions {
 
         @Override
         public void toggleOscLive() {
-            game.touchInput.setOnscreenControlsEnabled(!isOscVisible());
+            // Session-only: never overwrite the user's saved default OSC preference for future sessions
+            game.touchInput.setOnscreenControlsEnabled(!isOscVisible(), false);
         }
 
         @Override
         public boolean isPcKeyboardVisible() {
             return game.keyboardInput.isPcKeyboardVisible();
+        }
+
+        @Override
+        public void togglePerfOverlaySessionOnly() {
+            game.overlays.togglePerformanceOverlaySessionOnly();
         }
 
         @Override
@@ -245,6 +251,7 @@ final class GameMenuActions {
                     com.limelight.preferences.PreferenceConfiguration.OSC_LIVE_BLUR_PREF_STRING,
                     enabled).apply();
             if (game.moonlightVirtualController != null) {
+                game.moonlightVirtualController.getLiveBlurHelper().refreshBlurPreferenceNow();
                 game.moonlightVirtualController.refreshLayout();
             }
         }
@@ -256,6 +263,9 @@ final class GameMenuActions {
             prefs().edit().putInt(
                     com.limelight.preferences.PreferenceConfiguration.OSC_BLUR_AMOUNT_PREF_STRING,
                     clamped).apply();
+            if (game.moonlightVirtualController != null) {
+                game.moonlightVirtualController.getLiveBlurHelper().refreshBlurPreferenceNow();
+            }
         }
 
         @Override
@@ -265,6 +275,9 @@ final class GameMenuActions {
             prefs().edit().putInt(
                     com.limelight.preferences.PreferenceConfiguration.OSC_BLUR_RESOLUTION_PERCENT_PREF_STRING,
                     clamped).apply();
+            if (game.moonlightVirtualController != null) {
+                game.moonlightVirtualController.getLiveBlurHelper().refreshBlurPreferenceNow();
+            }
         }
 
         @Override
@@ -273,6 +286,9 @@ final class GameMenuActions {
             prefs().edit().putString(
                     com.limelight.preferences.PreferenceConfiguration.OSC_BLUR_FRAMERATE_PREF_STRING,
                     fps).apply();
+            if (game.moonlightVirtualController != null) {
+                game.moonlightVirtualController.getLiveBlurHelper().refreshBlurPreferenceNow();
+            }
         }
 
         @Override

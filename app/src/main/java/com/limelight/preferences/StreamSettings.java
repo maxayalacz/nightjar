@@ -418,6 +418,7 @@ public class StreamSettings extends NightjarActivity {
         android.app.Fragment fragment = getFragmentManager().findFragmentById(R.id.settings_sections);
         if (twoPane && fragment instanceof RootFragment) ((RootFragment) fragment).mark(row);
         if (rail != null) {
+            rail.refreshTheme();
             ListView list = listOf(R.id.settings_sections);
             rail.setList(list);
             rail.mark(list == null ? -1 : RootFragment.positionOf(list, row));
@@ -1555,6 +1556,15 @@ public class StreamSettings extends NightjarActivity {
             if (activity.twoPane) {
                 ListView list = view.findViewById(android.R.id.list);
                 list.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
+                list.setOnHierarchyChangeListener(new ViewGroup.OnHierarchyChangeListener() {
+                    @Override
+                    public void onChildViewAdded(View parent, View child) {
+                        styleRailRow(child, activity);
+                    }
+
+                    @Override
+                    public void onChildViewRemoved(View parent, View child) { }
+                });
                 // The right pane follows the row the D-pad is on.
                 list.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
                     @Override
@@ -1571,6 +1581,55 @@ public class StreamSettings extends NightjarActivity {
                 list.setOnFocusChangeListener((focused, hasFocus) -> activity.markSection());
             }
             return view;
+        }
+
+        private static void styleRailRow(View row, Activity activity) {
+            if (row == null || activity == null) return;
+            com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(activity);
+            float radius = activity.getResources().getDimension(R.dimen.nj_radius_control);
+            int stroke = Math.max(1, Math.round(activity.getResources().getDisplayMetrics().density));
+
+            // TV rail uses the shared sliding SettingsRail bar; landscape two-pane draws the activated pill per row
+            boolean isTv = GlassForm.of(activity) == GlassForm.TELEVISION;
+            if (!isTv) {
+                android.graphics.drawable.GradientDrawable activeBg = new android.graphics.drawable.GradientDrawable();
+                activeBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+                activeBg.setCornerRadius(radius);
+                activeBg.setColor((0x55 << 24) | (palette.accent & 0x00FFFFFF));
+                activeBg.setStroke(stroke, (0xAA << 24) | (palette.highlight & 0x00FFFFFF));
+
+                android.graphics.drawable.StateListDrawable stateBg = new android.graphics.drawable.StateListDrawable();
+                stateBg.addState(new int[]{android.R.attr.state_activated}, activeBg);
+                stateBg.addState(new int[]{}, new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+
+                android.graphics.drawable.GradientDrawable mask = new android.graphics.drawable.GradientDrawable();
+                mask.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+                mask.setCornerRadius(radius);
+                mask.setColor(android.graphics.Color.WHITE);
+
+                android.content.res.ColorStateList rippleColor = android.content.res.ColorStateList.valueOf(
+                        (0x38 << 24) | (palette.accent & 0x00FFFFFF));
+                row.setBackground(new android.graphics.drawable.RippleDrawable(rippleColor, stateBg, mask));
+            }
+
+            int[][] states = new int[][]{new int[]{android.R.attr.state_activated}, new int[]{}};
+            android.content.res.ColorStateList titleColors = new android.content.res.ColorStateList(
+                    states, new int[]{palette.highlight, palette.getPrimaryTextColor()});
+            android.content.res.ColorStateList iconColors = new android.content.res.ColorStateList(
+                    states, new int[]{palette.highlight, palette.getSecondaryTextColor()});
+
+            View title = row.findViewById(android.R.id.title);
+            if (title instanceof TextView) {
+                ((TextView) title).setTextColor(titleColors);
+            }
+            View summary = row.findViewById(android.R.id.summary);
+            if (summary instanceof TextView) {
+                ((TextView) summary).setTextColor(palette.getSecondaryTextColor());
+            }
+            View icon = row.findViewById(android.R.id.icon);
+            if (icon instanceof android.widget.ImageView) {
+                ((android.widget.ImageView) icon).setImageTintList(iconColors);
+            }
         }
 
         @Override
@@ -1603,11 +1662,21 @@ public class StreamSettings extends NightjarActivity {
             int checked = list.getCheckedItemPosition();
             if (position >= 0 && position != checked) list.setItemChecked(position, true);
             else if (section == null && checked >= 0) list.setItemChecked(checked, false);
+            Activity activity = getActivity();
+            for (int i = 0; i < list.getChildCount(); i++) {
+                styleRailRow(list.getChildAt(i), activity);
+            }
         }
 
         @Override
         public void onResume() {
             super.onResume();
+            ListView list = getView() == null ? null : (ListView) getView().findViewById(android.R.id.list);
+            if (list != null && getActivity() instanceof StreamSettings && ((StreamSettings) getActivity()).twoPane) {
+                for (int i = 0; i < list.getChildCount(); i++) {
+                    styleRailRow(list.getChildAt(i), getActivity());
+                }
+            }
             getPreferenceManager().getSharedPreferences().registerOnSharedPreferenceChangeListener(summaryUpdater);
             updateSummaries();
             StreamSettings activity = (StreamSettings) getActivity();

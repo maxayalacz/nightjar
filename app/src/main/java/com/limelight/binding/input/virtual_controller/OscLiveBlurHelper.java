@@ -181,8 +181,12 @@ public class OscLiveBlurHelper {
             return;
         }
         SurfaceView surfaceView = UiHelper.findStreamSurfaceView(activity);
-        if (surfaceView == null || surfaceView.getWidth() <= 0 || surfaceView.getHeight() <= 0
-                || !surfaceView.getHolder().getSurface().isValid()) {
+        android.view.TextureView textureView = (surfaceView == null) ? UiHelper.findStreamTextureView(activity) : null;
+        boolean hasSurface = surfaceView != null && surfaceView.getWidth() > 0 && surfaceView.getHeight() > 0
+                && surfaceView.getHolder().getSurface().isValid();
+        boolean hasTexture = !hasSurface && textureView != null && textureView.isAvailable()
+                && textureView.getWidth() > 0 && textureView.getHeight() > 0;
+        if (!hasSurface && !hasTexture) {
             View root = activity.findViewById(android.R.id.content);
             View portalCandidate = root != null ? root.findViewWithTag("oneui_portal_starfield_bg") : null;
             if (portalCandidate instanceof com.limelight.ui.PortalShaderView) {
@@ -191,9 +195,10 @@ public class OscLiveBlurHelper {
             return;
         }
 
-        final int sw = surfaceView.getWidth();
-        final int sh = surfaceView.getHeight();
-        surfaceView.getLocationOnScreen(surfaceLoc);
+        final View videoView = hasSurface ? surfaceView : textureView;
+        final int sw = videoView.getWidth();
+        final int sh = videoView.getHeight();
+        videoView.getLocationOnScreen(surfaceLoc);
         final int sl = surfaceLoc[0];
         final int st = surfaceLoc[1];
 
@@ -215,6 +220,25 @@ public class OscLiveBlurHelper {
 
         final int idx = writeIndex;
         final Bitmap target = buffers[idx];
+        if (hasTexture) {
+            try {
+                textureView.getBitmap(target);
+                int blurRadius = cachedBlurRadius;
+                if (blurRadius > 0) {
+                    UiHelper.fastBoxBlur(target, blurRadius, scratchPix, scratchTmp);
+                }
+                surfaceScreenLeft = sl;
+                surfaceScreenTop = st;
+                surfaceWidth = sw;
+                surfaceHeight = sh;
+                readyBitmap = target;
+                writeIndex = 1 - idx;
+                invalidateVisibleElements();
+            } catch (Throwable ignored) {
+            }
+            return;
+        }
+
         inFlight = true;
         try {
             PixelCopy.request(surfaceView, target, copyResult -> {

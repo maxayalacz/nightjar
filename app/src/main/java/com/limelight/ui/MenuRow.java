@@ -35,9 +35,11 @@ public final class MenuRow extends MaterialButton {
     public MenuRow(Context context, android.util.AttributeSet attrs) {
         super(context, attrs, androidx.appcompat.R.attr.borderlessButtonStyle);
         android.content.res.Resources res = context.getResources();
+        AppThemePalette palette = AppThemePalette.getCurrent(context);
         setAllCaps(false);
         setTextAppearance(context, R.style.TextAppearance_Nightjar_Label);
-        setTextColor(MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurface, 0));
+        setTextColor(palette.getPrimaryTextColor());
+        setRippleColor(android.content.res.ColorStateList.valueOf((0x38 << 24) | (palette.accent & 0x00FFFFFF)));
         setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         setSingleLine(true);
         setEllipsize(TextUtils.TruncateAt.END);
@@ -50,9 +52,11 @@ public final class MenuRow extends MaterialButton {
         chevronSize = Math.round(res.getDisplayMetrics().density * 18);
         setPaddingRelative(gap * 2, 0, gap * 2 + chevronSize, 0);
         setBackground(new GlassControlDrawable(context, GlassControlDrawable.Kind.ROW, res.getDimension(R.dimen.nj_radius_control)));
-        chevron = AppCompatResources.getDrawable(context, R.drawable.settings_chevron);
+        Drawable rawChevron = AppCompatResources.getDrawable(context, R.drawable.settings_chevron);
+        chevron = rawChevron != null ? rawChevron.mutate() : null;
+        if (chevron != null) chevron.setTint(palette.getSecondaryTextColor());
         valuePaint.setTextSize(res.getDimension(R.dimen.stream_menu_row_value));
-        valuePaint.setColor(MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurfaceVariant, 0));
+        valuePaint.setColor(palette.getSecondaryTextColor());
         valuePaint.setTypeface(getTypeface());
         capPaint.setTextSize(res.getDimension(R.dimen.stream_tile_cap_text));
         capPaint.setFakeBoldText(true);

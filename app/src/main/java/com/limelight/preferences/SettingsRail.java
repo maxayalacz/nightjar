@@ -71,7 +71,20 @@ final class SettingsRail implements ViewTreeObserver.OnPreDrawListener {
         this.rail = rail;
         this.bar = bar;
         this.pane = pane;
+        refreshTheme();
         rail.getViewTreeObserver().addOnPreDrawListener(this);
+    }
+
+    /** Re-applies active AppThemePalette colors to the sliding rail pill. */
+    void refreshTheme() {
+        com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(activity);
+        android.graphics.drawable.GradientDrawable pill = new android.graphics.drawable.GradientDrawable();
+        pill.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        pill.setCornerRadius(activity.getResources().getDimension(R.dimen.nj_radius_control));
+        pill.setColor((0x55 << 24) | (palette.accent & 0x00FFFFFF));
+        int stroke = Math.max(1, Math.round(activity.getResources().getDisplayMetrics().density));
+        pill.setStroke(stroke, (0xAA << 24) | (palette.highlight & 0x00FFFFFF));
+        bar.setBackground(pill);
     }
 
     /** The rail's list, once its fragment has a view. */

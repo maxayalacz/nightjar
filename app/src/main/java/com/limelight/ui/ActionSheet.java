@@ -36,6 +36,7 @@ public final class ActionSheet extends BottomSheetDialog {
     private final FooterBar footer;
     // A panel's cover beside its title, its surface, and the blur under it while it is open.
     private android.widget.ImageView cover;
+    private android.widget.FrameLayout panelHost;
     private GlassPanelDrawable menuGlass;
     private MenuBlurWindow blur;
     // The page blurred behind a sheet, or behind a panel that stands on a page; never over a stream.
@@ -252,10 +253,14 @@ public final class ActionSheet extends BottomSheetDialog {
                     LinearLayout.LayoutParams.WRAP_CONTENT));
             // Near-opaque until show() knows a blur stands under it.
             menuGlass = GlassPanelDrawable.menu(context, false);
-            body.setBackground(menuGlass);
-            body.setClipToOutline(true);
-            body.setElevation(spacing);
-            frame = new PanelFrame(context, body, context.getResources().getDimensionPixelSize(R.dimen.stream_menu_margin));
+            panelHost = new android.widget.FrameLayout(context);
+            panelHost.setBackground(menuGlass);
+            panelHost.setClipToOutline(true);
+            panelHost.setElevation(spacing);
+            panelHost.addView(body, new android.widget.FrameLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+            frame = new PanelFrame(context, panelHost, context.getResources().getDimensionPixelSize(R.dimen.stream_menu_margin));
             frame.setOnOutsideTap(this::cancel);
             setContentView(frame);
         } else {
@@ -532,15 +537,20 @@ public final class ActionSheet extends BottomSheetDialog {
         // A full step above the icon: half a step, or the button's own few pixels, left it against the tile's top edge.
         if (compact) button.setPaddingRelative(spacing, spacing, spacing, spacing / 2);
         else button.setPaddingRelative(spacing, Math.max(spacing, button.getPaddingTop()), spacing, button.getPaddingBottom());
+        AppThemePalette palette = AppThemePalette.getCurrent(context);
         int[][] states = {new int[] {android.R.attr.state_checked}, new int[] {}};
         android.content.res.ColorStateList foreground = new android.content.res.ColorStateList(states, new int[] {
-                MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnPrimaryContainer, 0),
-                MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurface, 0)});
+                palette.highlight,
+                palette.getPrimaryTextColor()});
         button.setTextColor(foreground);
         button.setIconTint(foreground);
         button.setBackgroundTintList(new android.content.res.ColorStateList(states, new int[] {
-                MaterialColors.getColor(context, com.google.android.material.R.attr.colorPrimaryContainer, 0),
+                (0x48 << 24) | (palette.accent & 0x00FFFFFF),
                 android.graphics.Color.TRANSPARENT}));
+        button.setStrokeColor(new android.content.res.ColorStateList(states, new int[] {
+                palette.highlight,
+                palette.getCardRimColor()}));
+        button.setRippleColor(android.content.res.ColorStateList.valueOf((0x38 << 24) | (palette.accent & 0x00FFFFFF)));
         row.addView(button, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1));
         styleToggle(button);
         claimFirstAction(button);
@@ -702,12 +712,14 @@ public final class ActionSheet extends BottomSheetDialog {
         Context context = getContext();
         android.content.res.Resources res = context.getResources();
         TileGrid.Tile button = new TileGrid.Tile(context, androidx.appcompat.R.attr.borderlessButtonStyle);
+        AppThemePalette palette = AppThemePalette.getCurrent(context);
         int ink = destructive ? androidx.core.content.ContextCompat.getColor(context, R.color.nj_color_on_danger_fill)
-                : MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurface, 0);
+                : palette.getPrimaryTextColor();
         button.setText(label);
         button.setAllCaps(false);
         button.setTextAppearance(context, R.style.TextAppearance_Nightjar_Label);
         button.setTextColor(ink);
+        button.setRippleColor(android.content.res.ColorStateList.valueOf((0x38 << 24) | (palette.accent & 0x00FFFFFF)));
         button.setSingleLine(true);
         button.setEllipsize(android.text.TextUtils.TruncateAt.END);
         button.setIconResource(icon);
@@ -757,7 +769,7 @@ public final class ActionSheet extends BottomSheetDialog {
         group.setOrientation(LinearLayout.VERTICAL);
         group.setBackground(new GlassControlDrawable(context, GlassControlDrawable.Kind.GROUP, res.getDimension(R.dimen.nj_radius_control)));
         android.graphics.drawable.GradientDrawable line = new android.graphics.drawable.GradientDrawable();
-        line.setColor(MaterialColors.getColor(context, R.attr.glassSeparator, 0));
+        line.setColor(AppThemePalette.getCurrent(context).getDividerColor());
         line.setSize(0, Math.max(1, Math.round(density)));
         group.setDividerDrawable(line);
         group.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
@@ -784,6 +796,7 @@ public final class ActionSheet extends BottomSheetDialog {
     public TextView addSliderRow(LinearLayout group, CharSequence label, CharSequence value, StepSlider slider) {
         Context context = getContext();
         android.content.res.Resources res = context.getResources();
+        AppThemePalette palette = AppThemePalette.getCurrent(context);
         LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.VERTICAL);
         row.setAddStatesFromChildren(true);
@@ -794,11 +807,11 @@ public final class ActionSheet extends BottomSheetDialog {
         TextView name = new TextView(context);
         name.setText(label);
         name.setTextAppearance(context, R.style.TextAppearance_Nightjar_Label);
-        name.setTextColor(MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurface, 0));
+        name.setTextColor(palette.getPrimaryTextColor());
         TextView shown = new TextView(context);
         shown.setText(value);
         shown.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, res.getDimension(R.dimen.stream_menu_row_value));
-        shown.setTextColor(MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurfaceVariant, 0));
+        shown.setTextColor(palette.getNeonAccent());
         shown.setGravity(Gravity.END);
         line.addView(name, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         line.addView(shown, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
@@ -809,12 +822,11 @@ public final class ActionSheet extends BottomSheetDialog {
         slider.setTrackStopIndicatorSize(0);
         slider.setThumbTrackGapSize(0);
         slider.setTrackHeight(Math.round(res.getDisplayMetrics().density * 6));
-        slider.setThumbTintList(android.content.res.ColorStateList.valueOf(
-                androidx.core.content.ContextCompat.getColor(context, R.color.nj_color_label)));
+        slider.setThumbTintList(android.content.res.ColorStateList.valueOf(palette.highlight));
         slider.setThumbElevation(0);
-        slider.setTrackActiveTintList(android.content.res.ColorStateList.valueOf(MaterialColors.getColor(context, androidx.appcompat.R.attr.colorPrimary, 0)));
+        slider.setTrackActiveTintList(android.content.res.ColorStateList.valueOf(palette.accent));
         slider.setTrackInactiveTintList(android.content.res.ColorStateList.valueOf(
-                androidx.core.content.ContextCompat.getColor(context, R.color.nj_tint_track_fill)));
+                (0x48 << 24) | (palette.getSecondaryTextColor() & 0x00FFFFFF)));
         slider.setHaloTintList(android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT));
         slider.setContentDescription(label);
         // The track starts under the name: the slider keeps a margin for its thumb that the row need not pay twice.
@@ -1075,7 +1087,7 @@ public final class ActionSheet extends BottomSheetDialog {
         TextView heading = new TextView(getContext());
         heading.setText(title);
         heading.setTextAppearance(getContext(), R.style.TextAppearance_Nightjar_Label);
-        heading.setTextColor(MaterialColors.getColor(getContext(), com.google.android.material.R.attr.colorOnSurfaceVariant, 0));
+        heading.setTextColor(AppThemePalette.getCurrent(getContext()).getSecondaryTextColor());
         heading.setPadding(spacing, compact ? spacing : spacing * 2, spacing, spacing);
         ViewCompat.setAccessibilityHeading(heading, true);
         return heading;
@@ -1114,8 +1126,9 @@ public final class ActionSheet extends BottomSheetDialog {
         TextView note = new TextView(getContext());
         note.setText(text);
         note.setTextAppearance(getContext(), R.style.TextAppearance_Nightjar_Supporting);
-        note.setTextColor(MaterialColors.getColor(getContext(), error ?
-                androidx.appcompat.R.attr.colorError : com.google.android.material.R.attr.colorOnSurfaceVariant, 0));
+        note.setTextColor(error
+                ? MaterialColors.getColor(getContext(), androidx.appcompat.R.attr.colorError, 0)
+                : AppThemePalette.getCurrent(getContext()).getSecondaryTextColor());
         note.setPadding(spacing, 0, spacing, spacing);
         parent.addView(note, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -1128,17 +1141,18 @@ public final class ActionSheet extends BottomSheetDialog {
 
     /** A fact with its label at the start and its value at the end. */
     public void addInfo(android.view.ViewGroup parent, CharSequence label, CharSequence value) {
+        AppThemePalette palette = AppThemePalette.getCurrent(getContext());
         LinearLayout row = new LinearLayout(getContext());
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(spacing, spacing / 2, spacing, spacing / 2);
         TextView name = new TextView(getContext());
         name.setText(label);
         name.setTextAppearance(getContext(), R.style.TextAppearance_Nightjar_Supporting);
-        name.setTextColor(MaterialColors.getColor(getContext(), com.google.android.material.R.attr.colorOnSurfaceVariant, 0));
+        name.setTextColor(palette.getSecondaryTextColor());
         TextView text = new TextView(getContext());
         text.setText(value);
         text.setTextAppearance(getContext(), R.style.TextAppearance_Nightjar_Body);
-        text.setTextColor(MaterialColors.getColor(getContext(), com.google.android.material.R.attr.colorOnSurface, 0));
+        text.setTextColor(palette.getPrimaryTextColor());
         text.setGravity(Gravity.END);
         row.addView(name, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -1394,7 +1408,16 @@ public final class ActionSheet extends BottomSheetDialog {
             });
             sheet.requestLayout();
         }
-        attachBlurTarget(body);
+        android.view.View blurView = panelHost != null ? panelHost : body;
+        attachBlurTarget(blurView);
+        if (panelHost != null && getOwnerActivity() != null && StreamGlass.overStream(getContext())
+                && !PortalBackgroundHelper.isRobolectric()) {
+            float radius = getContext().getResources().getDimension(R.dimen.nj_radius_panel);
+            com.limelight.utils.UiHelper.attachPanelBackdropBlur(getOwnerActivity(), panelHost, radius);
+            if (menuGlass != null) {
+                menuGlass.setOverBlur(true);
+            }
+        }
         if (!content.isInTouchMode() && firstAction != null) firstAction.requestFocus();
     }
 

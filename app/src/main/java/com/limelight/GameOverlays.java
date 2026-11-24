@@ -109,6 +109,14 @@ final class GameOverlays {
     }
 
     void togglePerformanceOverlay() {
+        togglePerformanceOverlay(true);
+    }
+
+    void togglePerformanceOverlaySessionOnly() {
+        togglePerformanceOverlay(false);
+    }
+
+    private void togglePerformanceOverlay(boolean persist) {
         if (game.app.getRole() == NvApp.Role.INPUT_ONLY) {
             return;
         }
@@ -117,7 +125,9 @@ final class GameOverlays {
         // A hidden overlay lays out no bounds to hear about; the hint returns to the top here.
         placeStreamMenuHint();
         boolean shown = game.prefConfig.enablePerfOverlay;
-        DualScreen.saveSettings(game, editor -> editor.putBoolean("checkbox_enable_perf_overlay", shown));
+        if (persist) {
+            DualScreen.saveSettings(game, editor -> editor.putBoolean("checkbox_enable_perf_overlay", shown));
+        }
         updateHardwareMetricsPolling();
     }
 

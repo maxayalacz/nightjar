@@ -134,6 +134,7 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
     // The on-screen controller, built the first time the controls are shown or their layout is edited.
     com.limelight.binding.input.pad.ModernController modernController;
     com.limelight.binding.input.virtual_controller.VirtualController moonlightVirtualController;
+    com.limelight.binding.input.virtual_controller.OscLayoutEditorOverlay oscLayoutEditorOverlay;
     // An external gamepad is connected; with Hide while a controller is connected the on-screen controls leave.
     volatile boolean physicalControllerConnected;
     com.limelight.ui.MicButton micButton;
@@ -959,6 +960,7 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
         }
         ((android.hardware.display.DisplayManager) getSystemService(DISPLAY_SERVICE))
                 .unregisterDisplayListener(inputDisplayListener);
+        if (oscLayoutEditorOverlay != null) { oscLayoutEditorOverlay.detach(); oscLayoutEditorOverlay = null; }
         if (portalOverlay != null) { portalOverlay.releaseAndHide(); portalOverlay = null; }
         if (spinner != null) { spinner.dismiss(); spinner = null; }
         SpinnerDialog.closeDialogs(this);
@@ -1176,7 +1178,9 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
      * controller or remote sent it.
      */
     void onBack(boolean byController) {
-        if (modernController != null && modernController.isEditing()) {
+        if (oscLayoutEditorOverlay != null && oscLayoutEditorOverlay.isAttached()) {
+            oscLayoutEditorOverlay.requestClose();
+        } else if (modernController != null && modernController.isEditing()) {
             // Back leaves the layout editor without keeping its changes, as Cancel does.
             modernController.finishEditing(false);
         } else if (connected && keyboardInput.isPcKeyboardVisible()) {
@@ -1334,6 +1338,7 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
                         controllerHandler, (FrameLayout) streamView.getParent(), this);
                 moonlightVirtualController.refreshLayout();
             }
+            moonlightVirtualController.setConfigureButtonVisible(false);
             moonlightVirtualController.show();
             touchInput.updateMicButton();
             touchInput.updateMenuButton();
@@ -1345,6 +1350,34 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
         modernController.show();
         touchInput.updateMicButton();
         touchInput.updateMenuButton();
+    }
+
+    /** Launches Moonlight's precision OscLayoutEditorOverlay (identical to Settings editor) over the live stream. */
+    void startInlineOscLayoutEdit() {
+        if (externalPresentation != null || streamView == null || !(streamView.getParent() instanceof FrameLayout)) {
+            return;
+        }
+        FrameLayout root = (FrameLayout) streamView.getParent();
+        if (modernController != null) modernController.hide();
+        if (moonlightVirtualController == null) {
+            moonlightVirtualController = new com.limelight.binding.input.virtual_controller.VirtualController(
+                    controllerHandler, root, this);
+            moonlightVirtualController.refreshLayout();
+        }
+        moonlightVirtualController.setConfigureButtonVisible(false);
+        if (!moonlightVirtualController.isVisible()) {
+            moonlightVirtualController.show();
+        }
+        if (oscLayoutEditorOverlay != null && oscLayoutEditorOverlay.isAttached()) {
+            oscLayoutEditorOverlay.refreshAfterControllerRemount();
+            return;
+        }
+        oscLayoutEditorOverlay = new com.limelight.binding.input.virtual_controller.OscLayoutEditorOverlay(
+                this,
+                root,
+                moonlightVirtualController,
+                () -> oscLayoutEditorOverlay = null);
+        oscLayoutEditorOverlay.attach();
     }
 
     /** Builds the on-screen controller without showing it, so its layout can be edited while a gamepad hides it. */

@@ -54,12 +54,13 @@ public class StepSlider extends Slider {
         setStepSize(1);
         setLabelBehavior(LabelFormatter.LABEL_FLOATING);
         setTickVisible(false);
-        int primary = ContextCompat.getColor(context, R.color.night_primary);
-        setThumbTintList(ColorStateList.valueOf(primary));
-        setTrackActiveTintList(ColorStateList.valueOf(primary));
-        setTrackInactiveTintList(ColorStateList.valueOf(ContextCompat.getColor(context, R.color.night_outline_variant)));
+        AppThemePalette palette = AppThemePalette.getCurrent(context);
+        setThumbTintList(ColorStateList.valueOf(palette.highlight));
+        setTrackActiveTintList(ColorStateList.valueOf(palette.accent));
+        setTrackInactiveTintList(ColorStateList.valueOf(
+                ColorUtils.setAlphaComponent(palette.getSecondaryTextColor(), 0x48)));
         // Material 3 draws no halo; a focused slider shows one so a TV remote can see where it is.
-        setHaloTintList(ColorStateList.valueOf(ColorUtils.setAlphaComponent(primary, 0x55)));
+        setHaloTintList(ColorStateList.valueOf(ColorUtils.setAlphaComponent(palette.accent, 0x55)));
         addOnChangeListener((slider, value, fromUser) -> {
             if (fromUser && listener != null) listener.onPositionChanged(this, Math.round(value));
         });

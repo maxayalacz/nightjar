@@ -78,6 +78,7 @@ public final class PortalQuickMenu {
         boolean isOscVisible();
         void toggleOscLive();
         boolean isPcKeyboardVisible();
+        void togglePerfOverlaySessionOnly();
         void sendClipboardLive();
         void fetchClipboardLive();
         void setOscOpacityLive(int opacity);
@@ -353,7 +354,7 @@ public final class PortalQuickMenu {
         attachFocusRing(btnPerf, refreshPerfTile);
         btnPerf.setOnClickListener(v -> {
             animateTileTap(v);
-            onItem.accept(StreamMenu.Item.OVERLAY);
+            host.togglePerfOverlaySessionOnly();
             refreshPerfTile.run();
         });
 
@@ -483,6 +484,7 @@ public final class PortalQuickMenu {
                     .start();
 
             if (open) {
+                blurController.setDrawerAnimating(true);
                 sideDrawerCard.setVisibility(View.VISIBLE);
                 sideDrawerCard.animate().cancel();
                 sideDrawerCard.animate()
@@ -491,8 +493,10 @@ public final class PortalQuickMenu {
                         .setDuration(240L)
                         .setInterpolator(SPRING_EASE)
                         .setUpdateListener(a -> sideDrawerCard.invalidate())
+                        .withEndAction(() -> blurController.setDrawerAnimating(false))
                         .start();
             } else {
+                blurController.setDrawerAnimating(true);
                 sideDrawerCard.animate().cancel();
                 sideDrawerCard.animate()
                         .translationX(hiddenOffset)
@@ -501,6 +505,7 @@ public final class PortalQuickMenu {
                         .setInterpolator(SPRING_EASE)
                         .setUpdateListener(a -> sideDrawerCard.invalidate())
                         .withEndAction(() -> {
+                            blurController.setDrawerAnimating(false);
                             if (!drawerOpen) {
                                 sideDrawerCard.setVisibility(View.GONE);
                             }
@@ -514,6 +519,7 @@ public final class PortalQuickMenu {
             drawerOnRight = !drawerOnRight;
             prefs.edit().putBoolean(PREF_DRAWER_ON_RIGHT, drawerOnRight).apply();
 
+            blurController.setDrawerAnimating(true);
             sideDrawerCard.animate().cancel();
             drawerLp.gravity = (drawerOnRight ? Gravity.END : Gravity.START) | Gravity.CENTER_VERTICAL;
             sideDrawerCard.setLayoutParams(drawerLp);
@@ -527,6 +533,7 @@ public final class PortalQuickMenu {
                     .setDuration(240L)
                     .setInterpolator(SPRING_EASE)
                     .setUpdateListener(a -> sideDrawerCard.invalidate())
+                    .withEndAction(() -> blurController.setDrawerAnimating(false))
                     .start();
 
             updateQuickMenuShift.run();
@@ -1456,130 +1463,251 @@ public final class PortalQuickMenu {
         return kbps + " kbps";
     }
 
-    /** Single-pass off-UI-thread PixelCopy live stream blur shared by Quick Menu and Side Drawer. */
+    /** Single-pass off-UI-thread PixelCopy / TextureView live stream blur shared by Quick Menu and Side Drawer (1:1 Moonlight port). */
     private static final class StreamBlurController {
+        private static final long IDLE_CAPTURE_INTERVAL_MS = 25L;
+        private static final long ACTIVE_CAPTURE_INTERVAL_MS = 16L;
+
         private final Activity activity;
         private final Handler mainHandler = new Handler(Looper.getMainLooper());
-        private final List<View> targets = new ArrayList<>();
-        private int blurPct;
-        private int resPct;
-        private int satPct;
-        private boolean liveEnabled;
+        private HandlerThread workerThread;
+        private Handler workerHandler;
+        private final List<FrostedStreamCardLayout> cards = new ArrayList<>();
+        private final int[] surfaceLoc = new int[2];
+        private final Bitmap[] buffers = new Bitmap[3];
+        private int[] scratchPix;
+        private int[] scratchTmp;
 
-        private HandlerThread copyThread;
-        private Handler copyHandler;
-        private volatile Bitmap latestBlurred;
-        private Bitmap copyBuffer;
-        private int[] pixBuf;
-        private int[] tmpBuf;
-        private boolean running = false;
-        private boolean inFlight = false;
+        private int writeIndex = 0;
+        private volatile Bitmap readyBitmap = null;
+        private volatile int surfaceScreenLeft = 0;
+        private volatile int surfaceScreenTop = 0;
+        private volatile int surfaceWidth = 0;
+        private volatile int surfaceHeight = 0;
+
+        private volatile boolean running = false;
+        private volatile boolean inFlight = false;
+        private volatile boolean drawerAnimating = false;
+        private volatile boolean batterySaver = false;
+        private volatile int blurPct;
+        private volatile int blurRadius;
+        private volatile int blurSaturationPct;
+        private volatile int captureLongEdge;
+
+        private final Runnable invalidateCardsRunnable = () -> {
+            for (int i = 0; i < cards.size(); i++) {
+                FrostedStreamCardLayout card = cards.get(i);
+                if (card.getVisibility() == View.VISIBLE) {
+                    card.invalidate();
+                }
+            }
+        };
+
+        private final Runnable captureTick = new Runnable() {
+            @Override
+            public void run() {
+                if (!running) return;
+                requestFrameCapture();
+                long interval = drawerAnimating ? ACTIVE_CAPTURE_INTERVAL_MS : IDLE_CAPTURE_INTERVAL_MS;
+                mainHandler.postDelayed(this, interval);
+            }
+        };
 
         StreamBlurController(Activity activity) {
             this.activity = activity;
-            reloadPrefs();
+            recomputeFromPrefs();
         }
 
-        private void reloadPrefs() {
+        void recomputeFromPrefs() {
+            AppThemePalette palette = AppThemePalette.getCurrent(activity);
             PreferenceConfiguration cfg = PreferenceConfiguration.readPreferences(activity);
-            this.liveEnabled = AppThemePalette.isLiveBlurEffective(activity) && cfg.blurAmountPercent > 0;
-            this.blurPct = Math.max(0, Math.min(200, cfg.blurAmountPercent));
-            this.resPct = Math.max(5, Math.min(40, cfg.blurResolutionPercent));
-            this.satPct = Math.max(0, Math.min(300, cfg.blurSaturationPercent));
+            int rawBlurPct = Math.max(0, Math.min(2000, cfg.blurAmountPercent));
+            this.blurSaturationPct = Math.max(0, Math.min(500, cfg.blurSaturationPercent));
+            this.batterySaver = PreferenceConfiguration.isUiBatterySaverEffective(activity);
+            if (batterySaver || rawBlurPct <= 0 || palette.getEffectiveTintAmount() >= 100) {
+                this.blurPct = 0;
+                this.blurRadius = 0;
+                this.captureLongEdge = 160;
+            } else {
+                this.blurPct = rawBlurPct;
+                this.blurRadius = Math.max(1, Math.min(18, Math.round(5f * (rawBlurPct / 100f))));
+                this.captureLongEdge = chooseCaptureLongEdge(rawBlurPct);
+            }
+        }
+
+        private static int chooseCaptureLongEdge(int blurPct) {
+            if (blurPct <= 35) return 280;
+            if (blurPct <= 85) return 220;
+            if (blurPct <= 140) return 160;
+            return 120;
+        }
+
+        int getBlurSaturationPct() {
+            return blurSaturationPct;
+        }
+
+        boolean isBatterySaver() {
+            return batterySaver;
+        }
+
+        void setDrawerAnimating(boolean animating) {
+            this.drawerAnimating = animating;
         }
 
         void onBatterySaverChanged() {
-            reloadPrefs();
-            if (!liveEnabled) {
-                latestBlurred = null;
+            recomputeFromPrefs();
+            if (blurRadius <= 0) {
                 stop();
             } else if (!running) {
                 start();
             }
-            for (View t : targets) {
-                t.invalidate();
+            mainHandler.post(invalidateCardsRunnable);
+        }
+
+        void registerTarget(FrostedStreamCardLayout card) {
+            if (!cards.contains(card)) {
+                cards.add(card);
             }
         }
 
-        void registerTarget(View v) {
-            targets.add(v);
-        }
-
         void start() {
-            if (!liveEnabled || Build.VERSION.SDK_INT < Build.VERSION_CODES.N || running) return;
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N || running || blurRadius <= 0) return;
             running = true;
-            copyThread = new HandlerThread("PortalQuickMenuBlur");
-            copyThread.start();
-            copyHandler = new Handler(copyThread.getLooper());
-            scheduleNext(0L);
+            workerThread = new HandlerThread("StreamBlurThread");
+            workerThread.start();
+            workerHandler = new Handler(workerThread.getLooper());
+            mainHandler.removeCallbacks(captureTick);
+            mainHandler.post(captureTick);
         }
 
         void stop() {
             running = false;
-            mainHandler.removeCallbacksAndMessages(null);
-            if (copyThread != null) {
-                copyThread.quitSafely();
-                copyThread = null;
-                copyHandler = null;
+            inFlight = false;
+            drawerAnimating = false;
+            mainHandler.removeCallbacks(captureTick);
+            mainHandler.removeCallbacks(invalidateCardsRunnable);
+            if (workerHandler != null) {
+                workerHandler.removeCallbacksAndMessages(null);
+                workerHandler = null;
             }
+            if (workerThread != null) {
+                workerThread.quitSafely();
+                workerThread = null;
+            }
+            readyBitmap = null;
+            scratchPix = null;
+            scratchTmp = null;
         }
 
-        @Nullable
-        Bitmap getBlurredBitmap() {
-            return liveEnabled ? latestBlurred : null;
-        }
+        @Nullable Bitmap getReadyBitmap() { return readyBitmap; }
+        int getSurfaceScreenLeft() { return surfaceScreenLeft; }
+        int getSurfaceScreenTop() { return surfaceScreenTop; }
+        int getSurfaceWidth() { return surfaceWidth; }
+        int getSurfaceHeight() { return surfaceHeight; }
 
-        float getSaturation() {
-            return satPct / 100f;
-        }
-
-        private void scheduleNext(long delayMs) {
-            if (!running) return;
-            mainHandler.postDelayed(this::requestFrame, delayMs);
-        }
-
-        private void requestFrame() {
-            if (!running || inFlight || copyHandler == null) return;
-            View sv = activity.findViewById(R.id.surfaceView);
-            if (!(sv instanceof SurfaceView)) return;
-            SurfaceView surfaceView = (SurfaceView) sv;
-            if (!surfaceView.getHolder().getSurface().isValid()
-                    || surfaceView.getWidth() <= 0 || surfaceView.getHeight() <= 0) {
-                scheduleNext(60L);
+        private void requestFrameCapture() {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N || inFlight
+                    || activity == null || activity.isFinishing()) {
                 return;
             }
-            float scale = resPct / 100f;
-            int w = Math.max(32, Math.round(surfaceView.getWidth() * scale));
-            int h = Math.max(32, Math.round(surfaceView.getHeight() * scale));
-            if (copyBuffer == null || copyBuffer.getWidth() != w || copyBuffer.getHeight() != h) {
-                copyBuffer = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-                pixBuf = new int[w * h];
-                tmpBuf = new int[w * h];
+            Handler bg = workerHandler;
+            if (bg == null) return;
+
+            SurfaceView surfaceView = UiHelper.findStreamSurfaceView(activity);
+            android.view.TextureView textureView = (surfaceView == null)
+                    ? UiHelper.findStreamTextureView(activity) : null;
+            boolean hasSurface = surfaceView != null && surfaceView.getWidth() > 0 && surfaceView.getHeight() > 0
+                    && surfaceView.getHolder().getSurface().isValid();
+            boolean hasTexture = !hasSurface && textureView != null && textureView.isAvailable()
+                    && textureView.getWidth() > 0 && textureView.getHeight() > 0;
+            if (!hasSurface && !hasTexture) return;
+
+            final View videoView = hasSurface ? surfaceView : textureView;
+            final int sw = videoView.getWidth();
+            final int sh = videoView.getHeight();
+            videoView.getLocationOnScreen(surfaceLoc);
+            final int sl = surfaceLoc[0];
+            final int st = surfaceLoc[1];
+
+            int bw;
+            int bh;
+            if (sw >= sh) {
+                bw = captureLongEdge;
+                bh = Math.max(16, Math.round(captureLongEdge * (sh / (float) sw)));
+            } else {
+                bh = captureLongEdge;
+                bw = Math.max(16, Math.round(captureLongEdge * (sw / (float) sh)));
             }
+
+            if (buffers[0] == null || buffers[0].getWidth() != bw || buffers[0].getHeight() != bh) {
+                for (int i = 0; i < buffers.length; i++) {
+                    buffers[i] = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888);
+                }
+                readyBitmap = null;
+            }
+            final int neededPixels = bw * bh;
+            if (scratchPix == null || scratchPix.length < neededPixels) {
+                scratchPix = new int[neededPixels];
+                scratchTmp = new int[neededPixels];
+            }
+
+            final int idx = writeIndex;
+            final Bitmap target = buffers[idx];
+            if (hasTexture) {
+                inFlight = true;
+                try {
+                    textureView.getBitmap(target);
+                    bg.post(() -> {
+                        if (!running) {
+                            inFlight = false;
+                            return;
+                        }
+                        int radius = blurRadius;
+                        if (radius > 0) {
+                            UiHelper.fastBoxBlur(target, radius, scratchPix, scratchTmp);
+                        }
+                        surfaceScreenLeft = sl;
+                        surfaceScreenTop = st;
+                        surfaceWidth = sw;
+                        surfaceHeight = sh;
+                        readyBitmap = target;
+                        writeIndex = (idx + 1) % buffers.length;
+                        inFlight = false;
+                        mainHandler.post(invalidateCardsRunnable);
+                    });
+                } catch (Throwable ignored) {
+                    inFlight = false;
+                }
+                return;
+            }
+
             inFlight = true;
             try {
-                PixelCopy.request(surfaceView, copyBuffer, result -> {
-                    inFlight = false;
-                    if (!running) return;
-                    if (result == PixelCopy.SUCCESS) {
-                        int radius = Math.max(1, Math.min(18, Math.round((blurPct / 100f) * 6f)));
-                        UiHelper.fastBoxBlur(copyBuffer, radius, pixBuf, tmpBuf);
-                        latestBlurred = copyBuffer;
-                        mainHandler.post(() -> {
-                            for (View t : targets) {
-                                if (t.getVisibility() == View.VISIBLE) t.invalidate();
-                            }
-                        });
+                PixelCopy.request(surfaceView, target, copyResult -> {
+                    if (!running || copyResult != PixelCopy.SUCCESS) {
+                        inFlight = false;
+                        return;
                     }
-                    scheduleNext(33L);
-                }, copyHandler);
-            } catch (Throwable ignored) {
+                    int radius = blurRadius;
+                    if (radius > 0) {
+                        UiHelper.fastBoxBlur(target, radius, scratchPix, scratchTmp);
+                    }
+                    surfaceScreenLeft = sl;
+                    surfaceScreenTop = st;
+                    surfaceWidth = sw;
+                    surfaceHeight = sh;
+                    readyBitmap = target;
+                    writeIndex = (idx + 1) % buffers.length;
+                    inFlight = false;
+                    mainHandler.post(invalidateCardsRunnable);
+                }, bg);
+            } catch (IllegalArgumentException | IllegalStateException e) {
                 inFlight = false;
             }
         }
     }
 
-    /** Frosted card layout drawing live blurred stream backdrop + flat One UI tint & rim. */
+    /** Frosted card layout drawing live screen-aligned blurred stream crop + flat One UI tint & rim (1:1 Moonlight port). */
     private static final class FrostedStreamCardLayout extends FrameLayout {
         private final AppThemePalette palette;
         private final StreamBlurController blur;
@@ -1588,8 +1716,10 @@ public final class PortalQuickMenu {
         private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint rimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path clipPath = new Path();
-        private final RectF bounds = new RectF();
-        private final int[] loc = new int[2];
+        private final RectF cardBounds = new RectF();
+        private final Rect srcRect = new Rect();
+        private final RectF dstRect = new RectF();
+        private final int[] viewLoc = new int[2];
 
         FrostedStreamCardLayout(Context context, AppThemePalette palette,
                                 StreamBlurController blur, float cornerRadius) {
@@ -1598,20 +1728,37 @@ public final class PortalQuickMenu {
             this.blur = blur;
             this.cornerRadius = cornerRadius;
             setWillNotDraw(false);
-            ColorMatrix cm = new ColorMatrix();
-            cm.setSaturation(blur.getSaturation());
-            bmpPaint.setColorFilter(new ColorMatrixColorFilter(cm));
+            setClickable(true);
+            int satPct = blur.getBlurSaturationPct();
+            if (satPct != 100) {
+                ColorMatrix cm = new ColorMatrix();
+                cm.setSaturation(satPct / 100f);
+                bmpPaint.setColorFilter(new ColorMatrixColorFilter(cm));
+            }
             rimPaint.setStyle(Paint.Style.STROKE);
             refreshRimOutline();
+            setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override
+                public void getOutline(View view, android.graphics.Outline outline) {
+                    outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), cornerRadius);
+                }
+            });
+            setClipToOutline(true);
+            blur.registerTarget(this);
         }
 
         void refreshRimOutline() {
-            float outlineScale = Math.max(0f, PreferenceConfiguration.readPreferences(getContext())
-                    .cardOutlineThicknessPercent / 100f);
-            rimPaint.setStrokeWidth(outlineScale <= 0f ? 0f
-                    : Math.max(1f, UiHelper.dpToPx(getContext(), 1.2f) * outlineScale));
             rimPaint.setColor(palette.getCardRimColor());
+            rimPaint.setStrokeWidth(UiHelper.getCardOutlineWidthPx(getContext(), 1.15f));
             invalidate();
+        }
+
+        @Override
+        protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+            super.onSizeChanged(w, h, oldw, oldh);
+            cardBounds.set(0f, 0f, w, h);
+            clipPath.reset();
+            clipPath.addRoundRect(cardBounds, cornerRadius, cornerRadius, Path.Direction.CW);
         }
 
         @Override
@@ -1619,36 +1766,57 @@ public final class PortalQuickMenu {
             int w = getWidth();
             int h = getHeight();
             if (w <= 0 || h <= 0) return;
-            bounds.set(0, 0, w, h);
-            clipPath.reset();
-            clipPath.addRoundRect(bounds, cornerRadius, cornerRadius, Path.Direction.CW);
+            if (cardBounds.width() != w || cardBounds.height() != h) {
+                cardBounds.set(0f, 0f, w, h);
+                clipPath.reset();
+                clipPath.addRoundRect(cardBounds, cornerRadius, cornerRadius, Path.Direction.CW);
+            }
 
-            Bitmap bmp = blur.getBlurredBitmap();
             boolean drewBlur = false;
-            if (bmp != null && !bmp.isRecycled()) {
-                getLocationOnScreen(loc);
-                int screenW = getResources().getDisplayMetrics().widthPixels;
-                int screenH = getResources().getDisplayMetrics().heightPixels;
-                if (screenW > 0 && screenH > 0) {
-                    canvas.save();
-                    canvas.clipPath(clipPath);
-                    Rect dst = new Rect(-loc[0], -loc[1], screenW - loc[0], screenH - loc[1]);
-                    canvas.drawBitmap(bmp, null, dst, bmpPaint);
-                    canvas.restore();
-                    drewBlur = true;
-                }
+            Bitmap bmp = blur.getReadyBitmap();
+            int sw = blur.getSurfaceWidth();
+            int sh = blur.getSurfaceHeight();
+
+            canvas.save();
+            canvas.clipPath(clipPath);
+
+            if (bmp != null && !bmp.isRecycled() && sw > 0 && sh > 0) {
+                getLocationOnScreen(viewLoc);
+                int originL = blur.getSurfaceScreenLeft();
+                int originT = blur.getSurfaceScreenTop();
+                int bw = bmp.getWidth();
+                int bh = bmp.getHeight();
+                float scaleX = bw / (float) sw;
+                float scaleY = bh / (float) sh;
+
+                int srcL = Math.max(0, Math.min(bw - 1, Math.round((viewLoc[0] - originL) * scaleX)));
+                int srcT = Math.max(0, Math.min(bh - 1, Math.round((viewLoc[1] - originT) * scaleY)));
+                int srcR = Math.max(srcL + 1, Math.min(bw, Math.round((viewLoc[0] + w - originL) * scaleX)));
+                int srcB = Math.max(srcT + 1, Math.min(bh, Math.round((viewLoc[1] + h - originT) * scaleY)));
+
+                srcRect.set(srcL, srcT, srcR, srcB);
+                dstRect.set(0f, 0f, w, h);
+                canvas.drawBitmap(bmp, srcRect, dstRect, bmpPaint);
+                drewBlur = true;
             }
 
-            fillPaint.setColor(palette.getQuickMenuCardTint(drewBlur || !blur.liveEnabled));
-            canvas.drawPath(clipPath, fillPaint);
-
-            if (rimPaint.getStrokeWidth() > 0f) {
-                float half = rimPaint.getStrokeWidth() * 0.5f;
-                bounds.inset(half, half);
-                canvas.drawRoundRect(bounds, Math.max(0f, cornerRadius - half),
-                        Math.max(0f, cornerRadius - half), rimPaint);
+            boolean matteFallback = !drewBlur && blur.isBatterySaver();
+            int tintColor = matteFallback
+                    ? (palette.surface | 0xFF000000)
+                    : palette.getQuickMenuCardTint(drewBlur || blur.blurPct <= 0);
+            if ((tintColor >>> 24) > 0) {
+                fillPaint.setColor(tintColor);
+                canvas.drawRect(cardBounds, fillPaint);
             }
-            super.onDraw(canvas);
+            canvas.restore();
+
+            float strokeW = rimPaint.getStrokeWidth();
+            if (strokeW > 0.1f) {
+                float inset = strokeW * 0.5f;
+                dstRect.set(inset, inset, w - inset, h - inset);
+                canvas.drawRoundRect(dstRect, Math.max(0f, cornerRadius - inset),
+                        Math.max(0f, cornerRadius - inset), rimPaint);
+            }
         }
     }
 }
