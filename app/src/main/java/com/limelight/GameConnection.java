@@ -132,6 +132,7 @@ final class GameConnection {
 
         // Inflate the content
         game.setContentView(R.layout.activity_game);
+        game.portalOverlay = game.findViewById(R.id.portalConnectionOverlay);
 
         // Start the spinner
         game.spinner = showConnecting(game.getString(R.string.conn_establishing_msg));
@@ -779,6 +780,18 @@ final class GameConnection {
             game.spinner = null;
         }
         android.content.Intent intent = game.getIntent();
+        if (game.portalOverlay != null && !"robolectric".equalsIgnoreCase(android.os.Build.FINGERPRINT)) {
+            String appName = intent.getStringExtra(Game.EXTRA_APP_NAME);
+            String pcName = intent.getStringExtra(Game.EXTRA_PC_NAME);
+            String title = (appName != null && !appName.isEmpty()) ? appName : pcName;
+            game.portalOverlay.startConnecting(title, detail, () -> {
+                if (game.portalOverlay != null) {
+                    game.portalOverlay.cancelWithReopen();
+                }
+                game.finish();
+            }, null);
+            return null;
+        }
         com.limelight.ui.ConnectingScreen screen = com.limelight.ui.ConnectingScreen.show(game, intent.getStringExtra(Game.EXTRA_APP_NAME),
                 intent.getStringExtra(Game.EXTRA_PC_NAME), game.getString(R.string.conn_establishing_title), detail, game::finish);
         if (screen == null) return null;
@@ -842,9 +855,13 @@ final class GameConnection {
         game.runOnUiThread(new Runnable() {
             @Override
             public void run() {
+                String text = game.getResources().getString(stageText(stage));
+                if (game.portalOverlay != null && game.portalOverlay.isOverlayActive()) {
+                    game.portalOverlay.updateStageMessage(text);
+                }
                 if (game.spinner != null) {
                     // The word follows the protocol's stage; the failure message names a stage that fails.
-                    game.spinner.setStage(game.getResources().getString(stageText(stage)));
+                    game.spinner.setStage(text);
                 }
             }
         });
@@ -1069,6 +1086,9 @@ final class GameConnection {
                 if (transientRecoveryFailure && game.streamRecovery.tryAutomaticRecovery()) return;
                 // The recovery's last attempt failed here: the dialog says why, then that it stopped.
                 final boolean recoveryExhausted = transientRecoveryFailure && game.recoveryBudgetExhausted;
+                if (game.portalOverlay != null && game.portalOverlay.isOverlayActive()) {
+                    game.portalOverlay.releaseAndHide();
+                }
                 if (game.spinner != null) {
                     game.spinner.dismiss();
                     game.spinner = null;
@@ -1456,6 +1476,9 @@ final class GameConnection {
                     openPlaySettled = com.limelight.console.OpenPlay.settleAfter(game, game.bitrateHandler);
                 }
                 dropConnectingCover();
+                if (game.portalOverlay != null && game.portalOverlay.isOverlayActive()) {
+                    game.portalOverlay.onConnectionStarted();
+                }
                 if (game.spinner != null) {
                     game.spinner.dismiss();
                     game.spinner = null;

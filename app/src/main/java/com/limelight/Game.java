@@ -143,6 +143,8 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
 
     NvConnection conn;
     com.limelight.ui.ConnectingScreen spinner;
+    com.limelight.ui.PortalConnectionOverlay portalOverlay;
+    boolean portalDisconnecting = false;
     boolean displayedFailureDialog = false;
     boolean connecting = false;
     // The second screen's stream has been started beside this one (DualScreen).
@@ -478,10 +480,21 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
         if (!exitFinished && !exiting) streamConnection.playerLeft();
         if (exitFinished) {
             super.finish();
-        } else if (exiting) {
+        } else if (exiting || portalDisconnecting) {
             LimeLog.info("Exit: already in progress, ignoring finish()");
         } else if (stagedExitApplies()) {
             beginStagedExit();
+        } else if (connected && !displayedFailureDialog && !isDestroyed()
+                && portalOverlay != null && !"robolectric".equalsIgnoreCase(Build.FINGERPRINT)) {
+            portalDisconnecting = true;
+            touchInput.setInputGrabState(false);
+            if (streamMenu != null) streamMenu.dismiss();
+            portalOverlay.startDisconnecting(() -> {
+                exitFinished = true;
+                Game.super.finish();
+                com.limelight.utils.UiHelper.disableActivityTransition(Game.this, true);
+            });
+            streamConnection.stopConnection();
         } else {
             exitFinished = true;
             super.finish();
@@ -945,6 +958,7 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
         }
         ((android.hardware.display.DisplayManager) getSystemService(DISPLAY_SERVICE))
                 .unregisterDisplayListener(inputDisplayListener);
+        if (portalOverlay != null) { portalOverlay.releaseAndHide(); portalOverlay = null; }
         if (spinner != null) { spinner.dismiss(); spinner = null; }
         SpinnerDialog.closeDialogs(this);
         Dialog.closeDialogs(this);

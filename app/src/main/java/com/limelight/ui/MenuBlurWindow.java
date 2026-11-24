@@ -47,7 +47,11 @@ final class MenuBlurWindow {
     /** The window, shown and still empty, or null when this device cannot blur now. {@code onSwitch} hears the system turn it off and on. */
     static MenuBlurWindow openIfAllowed(Activity owner, int radius, Consumer<Boolean> onSwitch) {
         if (!allowed(Build.VERSION.SDK_INT, GlassTier.land(owner), systemSwitch(owner))) return null;
-        return new MenuBlurWindow(owner, radius, onSwitch);
+        if (!AppThemePalette.isLiveBlurEffective(owner)) return null;
+        int blurPct = com.limelight.preferences.PreferenceConfiguration.readPreferences(owner).blurAmountPercent;
+        if (blurPct <= 0) return null;
+        int scaledRadius = Math.max(1, Math.min(180, Math.round(radius * (blurPct / 100f))));
+        return new MenuBlurWindow(owner, scaledRadius, onSwitch);
     }
 
     /**

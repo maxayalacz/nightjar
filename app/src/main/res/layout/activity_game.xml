@@ -130,4 +130,10 @@
         android:preferKeepClear="true"
         android:visibility="gone" />
 
+    <com.limelight.ui.PortalConnectionOverlay
+        android:id="@+id/portalConnectionOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
 </merge>

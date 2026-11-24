@@ -612,4 +612,29 @@
     <string name="home_setup_title">Set up for this device and %1$s</string>
     <string name="home_setup_codec_auto">codec chosen when the stream starts</string>
     <string name="home_setup_dismiss">Dismiss</string>
+
+    <!-- Theme Studio, Portal Shader & One UI Glass -->
+    <string name="cancel">Cancel</string>
+    <string name="conn_cancel_hint">Press Back to cancel</string>
+    <string name="title_theme_studio">Theme Studio</string>
+    <string name="summary_theme_studio">Customize colors, One UI glass blur, Portal shader background, and stream animations</string>
+    <string name="custom_palette_start_preset">Start from Preset</string>
+    <string name="theme_studio_applied">Theme applied</string>
+    <string name="theme_studio_tint_perf_hint" formatted="false">0% = crystal-clear glass • 100% = fully opaque (automatically disables live blur to save performance)</string>
+    <string name="theme_studio_no_saved_themes">No saved custom themes yet. Tap Save Theme to store your current design or Import from clipboard.</string>
+    <string name="theme_studio_save_title">Save Custom Theme</string>
+    <string name="theme_studio_saved_fmt">Saved \"%1$s\"</string>
+    <string name="theme_studio_loaded_fmt">Loaded \"%1$s\" into preview</string>
+    <string name="theme_studio_updated_fmt">Updated \"%1$s\"</string>
+    <string name="theme_studio_exported_clipboard">Theme copied to clipboard</string>
+    <string name="theme_studio_clipboard_empty">Clipboard is empty</string>
+    <string name="theme_studio_import_invalid">Clipboard does not contain a valid theme JSON</string>
+    <string name="theme_studio_imported_fmt">Imported \"%1$s\" into preview</string>
+    <string name="title_ui_performance_mode">UI Performance Mode</string>
+    <string name="title_ui_battery_saver">UI Battery Saver Mode</string>
+    <string name="title_bg_resolution_percent">Background Resolution</string>
+    <string name="title_blur_resolution_percent">Live Blur Resolution</string>
+    <string name="title_ui_framerate">Background &amp; Blur Framerate</string>
+    <string name="title_portal_show_cover_backdrop">Game Cover Art Backdrop</string>
+    <string name="summary_portal_show_cover_backdrop">Blend Nightjar\'s blurred game cover art over the Portal starfield on Home &amp; Game Detail</string>
 </resources>
