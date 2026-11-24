@@ -33,48 +33,73 @@ public class GlassButton extends MaterialButton {
         setAlpha(enabled ? 1f : 0.45f);
     }
 
+    private final boolean link;
+
     public GlassButton(Context context, AttributeSet attrs) {
         super(context, attrs);
         TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.GlassButton);
         moon = a.getBoolean(R.styleable.GlassButton_glassMoon, false);
-        boolean link = a.getBoolean(R.styleable.GlassButton_glassLink, false);
+        link = a.getBoolean(R.styleable.GlassButton_glassLink, false);
         a.recycle();
         android.content.res.Resources res = context.getResources();
         boolean highContrast = AppTheme.isHighContrast(context);
-        GradientDrawable shape = new GradientDrawable();
-        shape.setCornerRadius(res.getDimension(R.dimen.nj_radius_capsule));
-        if (moon) {
-            if (highContrast) {
-                shape.setColor(ResourcesCompat.getColor(res, R.color.nj_hc_color_moon, null));
-            } else {
-                shape.setOrientation(GradientDrawable.Orientation.TOP_BOTTOM);
-                shape.setColors(new int[] {ResourcesCompat.getColor(res, R.color.nj_color_moon_hi, null), 0xFFEE9F2E});
-            }
-            setTextColor(ResourcesCompat.getColor(res, highContrast ? R.color.nj_hc_color_on_moon : R.color.nj_color_on_moon, null));
-            setIconTint(android.content.res.ColorStateList.valueOf(
-                    ResourcesCompat.getColor(res, highContrast ? R.color.nj_hc_color_on_moon : R.color.nj_color_on_moon, null)));
-        } else if (link) {
-            shape.setColor(android.graphics.Color.TRANSPARENT);
-        } else {
-            shape.setColor(MaterialColors.getColor(context, R.attr.glassControlFill, 0));
-            shape.setStroke(Math.max(1, Math.round(res.getDisplayMetrics().density * 0.75f)),
-                    MaterialColors.getColor(context, highContrast ? com.google.android.material.R.attr.colorOnSurface : R.attr.glassControlRim, 0));
-        }
-        setBackgroundTintList(null);
-        setBackground(shape);
-        glow.setColor(0x66F2A93B);
         glowBlur = moon && !highContrast ? res.getDimension(R.dimen.glass_play_glow) : 0f;
         boolean reduced = Motion.reduced(context);
         focusScale = reduced ? 1f : ResourcesCompat.getFloat(res, R.dimen.nj_focus_scale_control);
         pressScale = reduced ? 1f : 0.97f;
         focusRing = new FocusRing(this, moon);
-        // The ring is the focus: Android's own highlight would show as square corners behind the capsule.
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) setDefaultFocusHighlightEnabled(false);
+        refreshTheme();
+    }
+
+    /** Re-applies active AppThemePalette colors and One UI frosted glass styling to this button. */
+    public void refreshTheme() {
+        Context context = getContext();
+        android.content.res.Resources res = context.getResources();
+        AppThemePalette palette = AppThemePalette.getCurrent(context);
+        boolean highContrast = AppTheme.isHighContrast(context);
+        GradientDrawable shape = new GradientDrawable();
+        shape.setCornerRadius(res.getDimension(R.dimen.nj_radius_capsule));
+        if (moon) {
+            if (highContrast) {
+                shape.setColor(palette.accent);
+            } else {
+                shape.setOrientation(GradientDrawable.Orientation.TOP_BOTTOM);
+                shape.setColors(new int[] {palette.highlight, palette.accent});
+            }
+            int onAccent = androidx.core.graphics.ColorUtils.calculateLuminance(palette.accent) > 0.45
+                    ? 0xFF0B0E14 : 0xFFFFFFFF;
+            setTextColor(onAccent);
+            setIconTint(android.content.res.ColorStateList.valueOf(onAccent));
+            glow.setColor((0x66 << 24) | (palette.accent & 0x00FFFFFF));
+        } else if (link) {
+            shape.setColor(android.graphics.Color.TRANSPARENT);
+            setTextColor(palette.accent);
+            setIconTint(android.content.res.ColorStateList.valueOf(palette.accent));
+        } else {
+            boolean liveBlur = AppThemePalette.isLiveBlurEffective(context);
+            shape.setColor(palette.getFrostedCardTint(0x52121826));
+            float outlineScale = Math.max(0f, com.limelight.preferences.PreferenceConfiguration
+                    .readPreferences(context).cardOutlineThicknessPercent / 100f);
+            int strokePx = outlineScale <= 0f ? 0 : Math.max(1, Math.round(res.getDisplayMetrics().density * outlineScale));
+            if (strokePx > 0) {
+                shape.setStroke(strokePx, highContrast ? palette.getPrimaryTextColor() : palette.cardOutline);
+            }
+            setTextColor(palette.getPrimaryTextColor());
+            setIconTint(android.content.res.ColorStateList.valueOf(palette.getPrimaryTextColor()));
+        }
+        setBackgroundTintList(null);
+        setBackground(shape);
+        focusRing.refreshTheme(context);
+        invalidate();
     }
 
     /** This control floats over covers with nothing to frost it: the denser fill keeps its words readable on bright art. */
     public void setOverArt() {
-        ((GradientDrawable) getBackground()).setColor(MaterialColors.getColor(getContext(), R.attr.glassControlOverArt, 0));
+        if (getBackground() instanceof GradientDrawable) {
+            AppThemePalette palette = AppThemePalette.getCurrent(getContext());
+            ((GradientDrawable) getBackground()).setColor((0xC8 << 24) | (palette.surface & 0x00FFFFFF));
+        }
     }
 
     @Override

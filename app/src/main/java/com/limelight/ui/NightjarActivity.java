@@ -59,12 +59,49 @@ public abstract class NightjarActivity extends AppCompatActivity {
         if (AppTheme.affectsAppearance(key)) refreshAppearance();
     };
 
+    private boolean finishingWithDepth = false;
+
     @Override
     protected void onCreate(Bundle state) {
         appearance = AppTheme.appearance(this);
         AppTheme.apply(this);
+        com.limelight.utils.UiHelper.disableAllActivityTransitions(this);
         super.onCreate(state);
         form = GlassForm.of(this);
+    }
+
+    @Override
+    public void startActivity(android.content.Intent intent, android.os.Bundle options) {
+        if (!PortalBackgroundHelper.isRobolectric() && intent != null && !isFinishing() && !isDestroyed()) {
+            android.content.ComponentName comp = intent.getComponent();
+            boolean isInternal = comp != null && getPackageName().equals(comp.getPackageName());
+            boolean isGame = comp != null && (comp.getClassName().endsWith(".Game")
+                    || comp.getClassName().endsWith(".GameSecondary"));
+            if (isInternal && !isGame) {
+                PortalBackgroundHelper.startMenuActivityWithDepth(this, intent,
+                        () -> super.startActivity(intent, options));
+                return;
+            }
+            if (isGame) {
+                PortalBackgroundHelper.captureHandoff(this);
+                PortalBackgroundHelper.markReturningFromStream();
+                super.startActivity(intent, options);
+                com.limelight.utils.UiHelper.disableActivityTransition(this, false);
+                return;
+            }
+        }
+        super.startActivity(intent, options);
+    }
+
+    @Override
+    public void finish() {
+        if (!PortalBackgroundHelper.isRobolectric() && !finishingWithDepth
+                && !recreatingForTheme && !recreatingForForm && !isDestroyed()) {
+            finishingWithDepth = true;
+            PortalBackgroundHelper.finishMenuWithDepth(this, super::finish);
+            return;
+        }
+        super.finish();
     }
 
     /** The form this screen was laid out for. */

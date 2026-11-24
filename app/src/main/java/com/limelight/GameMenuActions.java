@@ -70,6 +70,10 @@ final class GameMenuActions {
             if (streamMenuSheet != null && streamMenuSheet.sheet() == dialog) {
                 streamMenuSheet = null;
             }
+            if (portalQuickMenu != null && portalQuickMenu.dialog() == dialog) {
+                portalQuickMenu.onHostDismissed();
+                portalQuickMenu = null;
+            }
             game.suppressPipRefCount--;
             game.videoOutput.updatePipAutoEnter();
             Runnable action = game.streamMenuAction;
@@ -102,7 +106,10 @@ final class GameMenuActions {
      * The stream's bitrate for an open menu's slider: disabled while the PC has not said what it counts it as, usable
      * at the stream's number once it did (or the wait ended without it).
      */
+    private com.limelight.ui.PortalQuickMenu portalQuickMenu;
+
     void showBitrate(int kbps, boolean usable) {
+        if (portalQuickMenu != null) portalQuickMenu.showBitrate(kbps, usable);
         if (streamMenuSheet != null) streamMenuSheet.showBitrate(kbps, usable);
     }
 
@@ -143,6 +150,26 @@ final class GameMenuActions {
         // The audio switches show the host's state as it is now, so they appear once it answers.
         hostAudio = null;
         hostAudioUnread = false;
+        if (!"robolectric".equalsIgnoreCase(android.os.Build.FINGERPRINT)) {
+            portalQuickMenu = new com.limelight.ui.PortalQuickMenu(
+                    game,
+                    this::streamMenuOptions,
+                    this::onStreamMenuItem,
+                    () -> {
+                        portalQuickMenu = null;
+                        game.streamMenuAction = () -> showClassicStreamMenu(byController);
+                    });
+            showStreamDialog(portalQuickMenu.dialog());
+            refreshHostAudio();
+            return;
+        }
+        showClassicStreamMenu(byController);
+    }
+
+    private void showClassicStreamMenu(boolean byController) {
+        if (!game.foreground || !game.connected || game.streamMenu != null) {
+            return;
+        }
         streamMenuSheet = new com.limelight.ui.StreamMenu(game, this::streamMenuOptions, this::onStreamMenuItem,
                 nativeMenuController(), menuShortcuts);
         showStreamDialog(streamMenuSheet.sheet());
@@ -185,6 +212,7 @@ final class GameMenuActions {
 
     // The stream's size or rate changed: a menu left open names the new ones in its header. UI thread.
     void refreshStreamMenu() {
+        if (portalQuickMenu != null) portalQuickMenu.refresh();
         if (streamMenuSheet != null) streamMenuSheet.refresh();
     }
 
@@ -192,6 +220,7 @@ final class GameMenuActions {
         if (generation != game.foregroundGeneration || game.isFinishing()) return;
         hostAudio = audio;
         hostAudioUnread = audio == null;
+        if (portalQuickMenu != null) portalQuickMenu.refresh();
         if (streamMenuSheet != null) streamMenuSheet.refresh();
     }
 

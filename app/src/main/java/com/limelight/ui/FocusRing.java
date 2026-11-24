@@ -24,8 +24,11 @@ final class FocusRing {
     private final RectF rect = new RectF();
     private final Runnable invalidator;
 
+    private final boolean onMoon;
+
     FocusRing(View view, boolean onMoon) {
         this.view = view;
+        this.onMoon = onMoon;
         Context context = view.getContext();
         boolean highContrast = AppTheme.isHighContrast(context);
         ringWidth = context.getResources().getDimension(highContrast ? R.dimen.nj_hc_focus_ring_width : R.dimen.glass_ring_width);
@@ -33,12 +36,17 @@ final class FocusRing {
         haloBlur = highContrast ? 0f : context.getResources().getDimension(R.dimen.glass_halo_blur);
         ring.setStyle(Paint.Style.STROKE);
         ring.setStrokeWidth(ringWidth);
-        ring.setColor(MaterialColors.getColor(context, onMoon ? R.attr.glassRingOnMoon : R.attr.glassRing, 0));
         gap.setStyle(Paint.Style.STROKE);
         gap.setStrokeWidth(gapWidth);
-        gap.setColor(MaterialColors.getColor(context, R.attr.glassGap, 0));
-        halo.setColor(MaterialColors.getColor(context, R.attr.glassHalo, 0));
         invalidator = view::invalidate;
+        refreshTheme(context);
+    }
+
+    void refreshTheme(Context context) {
+        AppThemePalette palette = AppThemePalette.getCurrent(context);
+        ring.setColor(onMoon ? palette.getPrimaryTextColor() : palette.highlight);
+        gap.setColor((0xB0 << 24) | (palette.background & 0x00FFFFFF));
+        halo.setColor((0x70 << 24) | (palette.accent & 0x00FFFFFF));
     }
 
     /** Under the view's content. */

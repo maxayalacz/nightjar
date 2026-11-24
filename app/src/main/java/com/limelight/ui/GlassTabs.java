@@ -47,12 +47,22 @@ public class GlassTabs extends LinearLayout {
         super(context, attrs);
         setWillNotDraw(false);
         inset = context.getResources().getDimension(R.dimen.glass_tab_inset);
-        pill.setColor(MaterialColors.getColor(context, R.attr.glassSelectedFill, 0));
         pillRim.setStyle(Paint.Style.STROKE);
         pillRim.setStrokeWidth(Math.max(1f, context.getResources().getDisplayMetrics().density * 0.75f));
-        pillRim.setColor(MaterialColors.getColor(context, R.attr.glassSelectedRim, 0));
+        AppThemePalette palette = AppThemePalette.getCurrent(context);
+        pill.setColor((0x5C << 24) | (palette.accent & 0x00FFFFFF));
+        pillRim.setColor((0x99 << 24) | (palette.highlight & 0x00FFFFFF));
         pillAlpha = pill.getAlpha();
         pillRimAlpha = pillRim.getAlpha();
+    }
+
+    /** Updates tab pill colors to match the active AppThemePalette. */
+    public void refreshTheme() {
+        AppThemePalette palette = AppThemePalette.getCurrent(getContext());
+        pill.setColor((0x5C << 24) | (palette.accent & 0x00FFFFFF));
+        pillRim.setColor((0x99 << 24) | (palette.highlight & 0x00FFFFFF));
+        if (ring != null) ring.refreshTheme(getContext());
+        invalidate();
     }
 
     /** For tests: forgets the last bar. */

@@ -44,10 +44,10 @@ final class GlassControlDrawable extends Drawable {
     private final float radius;
     private final float ringWidth;
     private final float gapWidth;
-    private final int fillColor;
-    private final int checkedFill;
+    private int fillColor;
+    private int checkedFill;
     private final int lift;
-    private final int rimTop, rimMid, rimBottom, checkedRimTop;
+    private int rimTop, rimMid, rimBottom, checkedRimTop;
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint rim = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -68,14 +68,25 @@ final class GlassControlDrawable extends Drawable {
         this.radius = radius;
         android.content.res.Resources res = context.getResources();
         boolean highContrast = AppTheme.isHighContrast(context);
-        // Over a stream the app's overlays are not applied: high contrast's glass colours come from its overlay here.
-        Context glass = StreamGlass.themed(context);
         ringWidth = res.getDimension(highContrast ? R.dimen.nj_hc_focus_ring_width : R.dimen.dialog_button_ring);
         gapWidth = res.getDimension(R.dimen.dialog_button_gap) - ringWidth / 2f;
-        // A row can stand on a day sheet, where a white lift would not show.
         lift = kind == Kind.ROW ? MaterialColors.getColor(context, androidx.appcompat.R.attr.colorControlHighlight, 0)
                 : ResourcesCompat.getColor(res, R.color.nj_focus_fill_lift, null);
-        int controlRim = MaterialColors.getColor(glass, R.attr.glassControlRim, 0);
+        rim.setStyle(Paint.Style.STROKE);
+        ring.setStyle(Paint.Style.STROKE);
+        ring.setStrokeWidth(ringWidth);
+        refreshTheme(context);
+    }
+
+    void refreshTheme(Context context) {
+        android.content.res.Resources res = context.getResources();
+        AppThemePalette palette = AppThemePalette.getCurrent(context);
+        boolean liveBlur = AppThemePalette.isLiveBlurEffective(context);
+        int cardFill = palette.getFrostedCardTint(0x52121826);
+        int outline = palette.cardOutline;
+        float outlineScale = Math.max(0f, com.limelight.preferences.PreferenceConfiguration
+                .readPreferences(context).cardOutlineThicknessPercent / 100f);
+        rim.setStrokeWidth(outlineScale <= 0f ? 0f : Math.max(1f, res.getDisplayMetrics().density * outlineScale));
         switch (kind) {
             case DANGER:
                 fillColor = ResourcesCompat.getColor(res, R.color.nj_color_danger_fill, null);
@@ -86,35 +97,24 @@ final class GlassControlDrawable extends Drawable {
                 rimTop = rimMid = rimBottom = 0;
                 break;
             case GROUP:
-                fillColor = highContrast ? MaterialColors.getColor(glass, R.attr.glassControlFill, 0)
-                        : ResourcesCompat.getColor(res, R.color.nj_tint_group_fill, null);
-                rimTop = highContrast ? controlRim : ResourcesCompat.getColor(res, R.color.nj_tint_group_rim_top, null);
-                rimMid = highContrast ? controlRim : ResourcesCompat.getColor(res, R.color.nj_tint_group_rim_mid, null);
-                rimBottom = highContrast ? controlRim : ResourcesCompat.getColor(res, R.color.nj_tint_group_rim_bottom, null);
+                fillColor = cardFill;
+                rimTop = rimMid = rimBottom = outline;
                 break;
             case KEY:
-                fillColor = highContrast ? MaterialColors.getColor(glass, R.attr.glassControlFill, 0)
-                        : ResourcesCompat.getColor(res, R.color.nj_color_surface_high, null);
-                rimTop = highContrast ? controlRim : ResourcesCompat.getColor(res, R.color.nj_tint_control_rim_top, null);
-                rimMid = highContrast ? controlRim : ResourcesCompat.getColor(res, R.color.nj_tint_control_rim_mid, null);
-                rimBottom = highContrast ? controlRim : ResourcesCompat.getColor(res, R.color.nj_tint_control_rim_bottom, null);
+                fillColor = (0xE0 << 24) | (palette.surface & 0x00FFFFFF);
+                rimTop = rimMid = rimBottom = outline;
                 break;
             default:
-                fillColor = MaterialColors.getColor(glass, R.attr.glassControlFill, 0);
-                rimTop = highContrast ? controlRim : ResourcesCompat.getColor(res, R.color.nj_tint_control_rim_top, null);
-                rimMid = highContrast ? controlRim : ResourcesCompat.getColor(res, R.color.nj_tint_control_rim_mid, null);
-                rimBottom = highContrast ? controlRim : ResourcesCompat.getColor(res, R.color.nj_tint_control_rim_bottom, null);
+                fillColor = cardFill;
+                rimTop = rimMid = rimBottom = outline;
                 break;
         }
-        int selected = MaterialColors.getColor(glass, R.attr.glassSelectedFill, 0);
-        // A key stays opaque when selected: the tint goes over its own fill.
+        int selected = (0x5C << 24) | (palette.accent & 0x00FFFFFF);
         checkedFill = kind == Kind.KEY ? ColorUtils.compositeColors(selected, fillColor) : selected;
-        checkedRimTop = MaterialColors.getColor(glass, R.attr.glassSelectedRim, 0);
-        rim.setStyle(Paint.Style.STROKE);
-        rim.setStrokeWidth(Math.max(1f, res.getDisplayMetrics().density));
-        ring.setStyle(Paint.Style.STROKE);
-        ring.setStrokeWidth(ringWidth);
-        ring.setColor(MaterialColors.getColor(glass, kind == Kind.DANGER ? R.attr.glassRingOnMoon : R.attr.glassRing, 0));
+        checkedRimTop = (0xAA << 24) | (palette.highlight & 0x00FFFFFF);
+        ring.setColor(kind == Kind.DANGER ? palette.getPrimaryTextColor() : palette.highlight);
+        applyRim();
+        invalidateSelf();
     }
 
     private float corner(float width, float height, float inset) {

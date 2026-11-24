@@ -42,15 +42,20 @@ public final class GlassPanelDrawable extends Drawable {
 
     private GlassPanelDrawable(Context context, float[] radii) {
         this.radii = radii;
-        AppTheme.Look look = AppTheme.look(context);
-        boolean day = isDay(context);
-        spec = GlassSpec.of(context, "panel", AppTheme.isHighContrast(context) ? GlassTier.SOLID : GlassTier.BAKED, day);
-        fill.setColor(fillOn(canvas(context, look), spec.fill));
         rim.setStyle(Paint.Style.STROKE);
-        rim.setStrokeWidth(spec.rimWidth);
         hairline.setStyle(Paint.Style.STROKE);
         hairline.setStrokeWidth(Math.max(1f, context.getResources().getDisplayMetrics().density * 0.5f));
+        refreshTheme(context);
+    }
+
+    void refreshTheme(Context context) {
+        boolean day = isDay(context);
+        spec = GlassSpec.of(context, "panel", AppTheme.isHighContrast(context) ? GlassTier.SOLID : GlassTier.BAKED, day);
+        AppThemePalette palette = AppThemePalette.getCurrent(context);
+        fill.setColor(palette.getDialogSurfaceColor(AppThemePalette.isLiveBlurEffective(context)));
+        rim.setStrokeWidth(spec.rimWidth);
         hairline.setColor(spec.hairline);
+        invalidateSelf();
     }
 
     private GlassPanelDrawable(Context context, float radius, boolean overBlur) {

@@ -69,33 +69,25 @@ public class NightSkyView extends View {
 
     /** The flat fill of a PC's card or group on this look's sky. */
     public static int groupFill(Context context) {
-        switch (AppTheme.look(context)) {
-            case DAY:
-                return color(context, R.color.nj_day_tint_group_on_sky_fill);
-            case OLED:
-                return color(context, R.color.nj_oled_tint_group_on_sky_fill);
-            case HIGH_CONTRAST:
-                return color(context, R.color.nj_solid_group_fill);
-            default:
-                return color(context, R.color.nj_tint_group_on_sky_fill);
+        if (AppTheme.isHighContrast(context)) {
+            return color(context, R.color.nj_solid_group_fill);
         }
+        AppThemePalette palette = AppThemePalette.getCurrent(context);
+        return palette.getFrostedCardTint(0x52121826);
     }
 
     /** The lines between a group's rows on this look. */
     public static int separator(Context context) {
-        return AppTheme.look(context) == AppTheme.Look.DAY ? color(context, R.color.nj_day_tint_separator) : color(context, R.color.nj_tint_separator);
+        AppThemePalette palette = AppThemePalette.getCurrent(context);
+        return (0x40 << 24) | (palette.cardOutline & 0x00FFFFFF);
     }
 
     /** The moon's own ink, for an action that is not filled with it. */
     public static int moonInk(Context context) {
-        switch (AppTheme.look(context)) {
-            case DAY:
-                return color(context, R.color.nj_day_color_moon_ink);
-            case HIGH_CONTRAST:
-                return color(context, R.color.nj_hc_color_moon);
-            default:
-                return color(context, R.color.nj_color_moon_ink);
+        if (AppTheme.isHighContrast(context)) {
+            return color(context, R.color.nj_hc_color_moon);
         }
+        return AppThemePalette.getCurrent(context).accent;
     }
 
     /** The design's star field: the same seeded generator as the prototype, so the same stars on every run. */

@@ -139,6 +139,27 @@ public class CoverCard extends LinearLayout {
     }
 
     @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        if (!PortalBackgroundHelper.isRobolectric()) {
+            int pad = Math.round(com.limelight.utils.UiHelper.dpToPx(getContext(), 7f));
+            if (getPaddingLeft() == 0 && getPaddingTop() == 0 && getPaddingRight() == 0 && getPaddingBottom() == 0) {
+                setPadding(pad, pad, pad, pad);
+            }
+            PortalShaderView psv = PortalBackgroundHelper.getShaderView(PortalBackgroundHelper.activityOf(getContext()));
+            refreshTheme(psv);
+        }
+    }
+
+    /** Applies the outer One UI frosted glass card and updates focus ring colors. */
+    public void refreshTheme(PortalShaderView psv) {
+        if (PortalBackgroundHelper.isRobolectric()) return;
+        OneUiThemeApplier.applyFrostedCard(this, psv, FlowingAuroraView.CornerMode.ALL, 22f);
+        focusRing.refreshTheme(getContext());
+        invalidate();
+    }
+
+    @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         removeCallbacks(releaser);
