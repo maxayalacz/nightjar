@@ -35,6 +35,9 @@ jobs:
           echo "sdk.dir=${ANDROID_HOME}" > local.properties
           echo "ndk.dir=${ANDROID_HOME}/ndk/29.0.14206865" >> local.properties
 
+      - name: Setup Rust Android target
+        run: rustup target add aarch64-linux-android
+
       - name: Make gradlew executable
         run: chmod +x gradlew
 
