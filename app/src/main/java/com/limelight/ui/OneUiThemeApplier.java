@@ -41,6 +41,7 @@ public final class OneUiThemeApplier {
         AppThemePalette palette = AppThemePalette.getCurrent(activity);
         PortalShaderView psv = PortalBackgroundHelper.getShaderView(activity);
         applyRecursive(activity, content, palette, psv);
+        ShellBar.refresh(activity);
     }
 
     /** Applies unified One UI frosted card background to a view, backed by the activity's PortalShaderView. */

@@ -59,30 +59,25 @@ public final class NavigationDialogBuilder extends MaterialAlertDialogBuilder {
         if (list != null) list.setSelector(R.drawable.dialog_row_focus);
         boolean onSky = ownSurface && !overStream;
         if (dialog.getWindow() != null) {
-            // Over a stream the game stays in view around the glass, as around the stream menu; on its own surface the sky
-            // is all there is behind it, as around the PIN lock.
-            if (overStream || onSky) dialog.getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            else dialog.getWindow().setDimAmount(GlassPanelDrawable.dialogBackdropDim(getContext()));
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            if (overStream || onSky) {
+                dialog.getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            } else {
+                dialog.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+                dialog.getWindow().setDimAmount(0.38f);
+            }
         }
-        // On a page, the page blurs behind the dialog where this device affords it; never over a stream, and not under a sky
-        // that hides it.
         if (onSky) DialogSky.under(dialog);
-        else PageBlur.behind(dialog);
         // Builds the views now: the buttons exist, and their bar can be laid out for capsules.
         dialog.create();
         styleButtons(dialog);
         DialogInterface.OnKeyListener custom = keyListener;
-        // One filter per dialog: a pad that sends DPAD keys and a hat must not move its focus twice. The
-        // dialog is short-lived, so it has no focus-loss reset (the listener has no hook for it).
         DpadEchoFilter dpadEchoes = new DpadEchoFilter();
         dialog.setOnKeyListener((target, key, event) -> {
             if (dpadEchoes.drop(event)) return true;
             if (custom != null && custom.onKey(target, key, event)) return true;
-            // A dialog has its own window, out of the page's reach: Y would come back as Space and press its button.
-            // This listener runs before the dialog's views, so a focused text field is asked for here.
             if (UiNavigation.swallowsPadY(key, dialog.getCurrentFocus())) return true;
             if (!event.hasNoModifiers() || (key != KeyEvent.KEYCODE_BUTTON_B && key != KeyEvent.KEYCODE_ESCAPE)) return false;
-            // Use the normal Back path: cancel callbacks and non-cancelable dialogs retain their rules.
             if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) dialog.onBackPressed();
             return true;
         });
@@ -90,25 +85,57 @@ public final class NavigationDialogBuilder extends MaterialAlertDialogBuilder {
     }
 
     private void styleButtons(AlertDialog dialog) {
+        Context ctx = getContext();
+        AppThemePalette palette = AppThemePalette.getCurrent(ctx);
+        // Style dialog text elements with active theme palette
+        android.widget.TextView titleTv = dialog.findViewById(androidx.appcompat.R.id.alertTitle);
+        if (titleTv != null) titleTv.setTextColor(palette.getPrimaryTextColor());
+        android.widget.TextView msgTv = dialog.findViewById(android.R.id.message);
+        if (msgTv != null) msgTv.setTextColor(palette.getSecondaryTextColor());
+
         Button positive = dialog.getButton(DialogInterface.BUTTON_POSITIVE);
+        Button negative = dialog.getButton(DialogInterface.BUTTON_NEGATIVE);
+        Button neutral = dialog.getButton(DialogInterface.BUTTON_NEUTRAL);
+
+        float radius = com.limelight.utils.UiHelper.dpToPx(ctx, 20f);
+        float outlineScale = Math.max(0f, com.limelight.preferences.PreferenceConfiguration
+                .readPreferences(ctx).cardOutlineThicknessPercent / 100f);
+        int strokePx = outlineScale <= 0f ? 0 : Math.max(1, Math.round(com.limelight.utils.UiHelper.dpToPx(ctx, 1f) * outlineScale));
+
+        if (positive != null) {
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[] {palette.highlight, palette.accent});
+            bg.setCornerRadius(radius);
+            positive.setBackgroundTintList(null);
+            positive.setBackground(bg);
+            int onAccent = androidx.core.graphics.ColorUtils.calculateLuminance(palette.accent) > 0.45
+                    ? 0xFF0B0E14 : 0xFFFFFFFF;
+            positive.setTextColor(onAccent);
+        }
+        for (Button secondary : new Button[] {negative, neutral}) {
+            if (secondary == null) continue;
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setCornerRadius(radius);
+            bg.setColor(palette.getFrostedCardTint(0x52121826));
+            if (strokePx > 0) bg.setStroke(strokePx, palette.getCardRimColor());
+            secondary.setBackgroundTintList(null);
+            secondary.setBackground(bg);
+            secondary.setTextColor(palette.getPrimaryTextColor());
+        }
+
         if (positive == null || !(positive.getParent() instanceof ViewGroup)) return;
-        // Capsules want air the text buttons did not: the bar stands on the panel's own margin.
-        android.content.res.Resources res = getContext().getResources();
+        android.content.res.Resources res = ctx.getResources();
         int edge = res.getDimensionPixelSize(R.dimen.space_l);
         ViewGroup bar = (ViewGroup) positive.getParent();
         bar.setPaddingRelative(edge, res.getDimensionPixelSize(R.dimen.space_m), edge, edge);
-        // The bar's scroller took the window's first focus and showed the platform's grey highlight over the whole bar.
         if (bar.getParent() instanceof android.widget.ScrollView) {
             View scroller = (View) bar.getParent();
             scroller.setFocusable(false);
             if (android.os.Build.VERSION.SDK_INT >= 26) scroller.setDefaultFocusHighlightEnabled(false);
         }
-        // A pad or a remote starts on the moon, the dialog's one way on. A list keeps its first focus on its rows.
-        Button negative = dialog.getButton(DialogInterface.BUTTON_NEGATIVE);
         boolean cancelFirst = startOnCancel && negative != null && negative.getVisibility() == View.VISIBLE;
         if (android.os.Build.VERSION.SDK_INT >= 26 && dialog.getListView() == null) (cancelFirst ? negative : positive).setFocusedByDefault(true);
-        // Labels too long to share a row stack: as full-width capsules, not a staircase along the right edge. A row the
-        // dialog's button scroller cannot scroll sideways is stacked too, so its last capsule is not cut at the panel.
         bar.addOnLayoutChangeListener((view, l, t, r, b, ol, ot, or, ob) -> {
             if (!(bar instanceof android.widget.LinearLayout)) return;
             if (((android.widget.LinearLayout) bar).getOrientation() == android.widget.LinearLayout.VERTICAL) {

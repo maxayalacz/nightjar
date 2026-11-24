@@ -67,6 +67,22 @@ public class MaterialSwitchPreference extends SwitchPreference {
         row = new WeakReference<>(view);
         MaterialSwitch toggle = view.findViewById(R.id.preference_switch);
         toggle.setChecked(isChecked());
+        com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(getContext());
+        int[][] states = new int[][] { new int[] { android.R.attr.state_checked }, new int[] {} };
+        int onAccent = androidx.core.graphics.ColorUtils.calculateLuminance(palette.accent) > 0.45
+                ? 0xFF0B0E14 : 0xFFFFFFFF;
+        toggle.setThumbTintList(new android.content.res.ColorStateList(states,
+                new int[] { onAccent, palette.getSecondaryTextColor() }));
+        toggle.setTrackTintList(new android.content.res.ColorStateList(states,
+                new int[] { palette.accent, (0x44 << 24) | (palette.secondaryText & 0x00FFFFFF) }));
+        toggle.setTrackDecorationTintList(new android.content.res.ColorStateList(states,
+                new int[] { palette.highlight, palette.getCardRimColor() }));
+
+        android.widget.TextView titleView = view.findViewById(android.R.id.title);
+        if (titleView != null) titleView.setTextColor(palette.getPrimaryTextColor());
+        android.widget.TextView summaryView = view.findViewById(android.R.id.summary);
+        if (summaryView != null) summaryView.setTextColor(palette.getSecondaryTextColor());
+
         Runnable showExplanation = explanation == null ? null : () -> UiHelper.showDialog(getContext(),
                 new NavigationDialogBuilder(getContext()).setTitle(getTitle()).setMessage(explanation)
                         .setPositiveButton(android.R.string.ok, null).create());
@@ -74,8 +90,7 @@ public class MaterialSwitchPreference extends SwitchPreference {
         info.setVisibility(showExplanation == null ? View.GONE : View.VISIBLE);
         info.setContentDescription(getContext().getString(R.string.setting_help, getTitle()));
         info.setOnClickListener(showExplanation == null ? null : v -> showExplanation.run());
-        // The explanation also says why a switch is unavailable, so it still opens on a disabled row,
-        // where the button dims to Material's disabled emphasis like the rest of the row.
+        info.setImageTintList(android.content.res.ColorStateList.valueOf(palette.getSecondaryTextColor()));
         info.setEnabled(showExplanation != null);
         info.setAlpha(isEnabled() ? 1f : DISABLED_ALPHA);
         view.setTag(R.id.preference_help, showExplanation);

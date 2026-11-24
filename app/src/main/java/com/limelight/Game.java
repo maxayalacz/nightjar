@@ -133,6 +133,7 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
     boolean dispatchingDesktopTouch;
     // The on-screen controller, built the first time the controls are shown or their layout is edited.
     com.limelight.binding.input.pad.ModernController modernController;
+    com.limelight.binding.input.virtual_controller.VirtualController moonlightVirtualController;
     // An external gamepad is connected; with Hide while a controller is connected the on-screen controls leave.
     volatile boolean physicalControllerConnected;
     com.limelight.ui.MicButton micButton;
@@ -1303,10 +1304,15 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
         // when the moving began, and hiding them now would close their open editor and drop its draft.
     }
 
+    private boolean useMoonlightOsc() {
+        return prefConfig == null || !PreferenceConfiguration.OSC_ENGINE_NIGHTJAR.equals(prefConfig.oscEngine);
+    }
+
     void hideOnscreenControllers() {
+        if (moonlightVirtualController != null) {
+            moonlightVirtualController.hide();
+        }
         if (modernController != null) {
-            // Moving the game buttons puts the controls aside only for a while: an open editor of theirs is the
-            // player's work and keeps its draft.
             if (!movingGameButtons()) modernController.finishEditing(false);
             modernController.hide();
         }
@@ -1321,12 +1327,22 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
             hideOnscreenControllers();
             return;
         }
+        if (useMoonlightOsc()) {
+            if (modernController != null) modernController.hide();
+            if (moonlightVirtualController == null) {
+                moonlightVirtualController = new com.limelight.binding.input.virtual_controller.VirtualController(
+                        controllerHandler, (FrameLayout) streamView.getParent(), this);
+                moonlightVirtualController.refreshLayout();
+            }
+            moonlightVirtualController.show();
+            touchInput.updateMicButton();
+            touchInput.updateMenuButton();
+            return;
+        }
+        if (moonlightVirtualController != null) moonlightVirtualController.hide();
         ensureModernController();
-        // The stream may have turned while a pad kept the controls off the screen, so the switch brings this
-        // orientation's layout back with the controls, as onConfigurationChanged would have.
         modernController.onOrientationChanged();
         modernController.show();
-        // The controls came back: the microphone and menu buttons follow the top row again, as after hiding.
         touchInput.updateMicButton();
         touchInput.updateMenuButton();
     }

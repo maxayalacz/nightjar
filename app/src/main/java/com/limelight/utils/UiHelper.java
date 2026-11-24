@@ -282,6 +282,21 @@ public class UiHelper {
         return dp * context.getResources().getDisplayMetrics().density;
     }
 
+    public static float getCardOutlineWidthPx(Context context, float baseDp) {
+        float scale = Math.max(0f, PreferenceConfiguration.readPreferences(context).cardOutlineThicknessPercent / 100f);
+        return scale <= 0f ? 0f : Math.max(1f, dpToPx(context, baseDp) * scale);
+    }
+
+    public static Activity findActivity(Context context) {
+        return com.limelight.ui.PortalBackgroundHelper.activityOf(context);
+    }
+
+    public static android.view.SurfaceView findStreamSurfaceView(Activity activity) {
+        if (activity == null) return null;
+        View v = activity.findViewById(R.id.surfaceView);
+        return v instanceof android.view.SurfaceView ? (android.view.SurfaceView) v : null;
+    }
+
     public static void disableAllActivityTransitions(Activity activity) {
         if (activity == null) return;
         disableActivityTransition(activity, false);

@@ -202,6 +202,26 @@ public class GlassSurface extends FrameLayout {
 
     private final Runnable invalidator = this::invalidate;
 
+    private final Paint portalBlurPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
+    private final int[] screenLoc = new int[2];
+    private final android.graphics.Rect portalDst = new android.graphics.Rect();
+    private android.graphics.drawable.Drawable portalTickListener;
+
+    private void ensurePortalLiveListener() {
+        if (portalTickListener != null || PortalBackgroundHelper.isRobolectric()) return;
+        android.app.Activity act = PortalBackgroundHelper.activityOf(getContext());
+        PortalShaderView psv = PortalBackgroundHelper.getShaderView(act);
+        if (psv == null) return;
+        portalTickListener = new android.graphics.drawable.Drawable() {
+            @Override public void draw(Canvas canvas) { }
+            @Override public void setAlpha(int alpha) { }
+            @Override public void setColorFilter(android.graphics.ColorFilter cf) { }
+            @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
+            @Override public void invalidateSelf() { GlassSurface.this.postInvalidateOnAnimation(); }
+        };
+        psv.registerFrostedDrawable(portalTickListener);
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
@@ -210,9 +230,13 @@ public class GlassSurface extends FrameLayout {
         if (isFocused() || focusShown) focusRing().drawHalo(canvas, 0, 0, getWidth(), getHeight(), cornerRadius());
         drawBack(canvas);
         canvas.drawPath(shape, fillPaint);
-        if (spec.sheenEnd > 0f) canvas.drawPath(shape, sheenPaint);
-        canvas.drawPath(rimShape, rimPaint);
-        if (spec.hairline != 0) canvas.drawPath(shape, hairlinePaint);
+        // Flat uniform One UI card outline (no specular sheen or lens highlight)
+        if (spec.rimWidth > 0f) {
+            rimPaint.setShader(null);
+            rimPaint.setColor(AppThemePalette.getCurrent(getContext()).getCardRimColor());
+            rimPaint.setStrokeWidth(spec.rimWidth);
+            canvas.drawPath(rimShape, rimPaint);
+        }
     }
 
     @Override
@@ -268,7 +292,35 @@ public class GlassSurface extends FrameLayout {
     }
 
     private void drawBack(Canvas canvas) {
-        if (host == null || tier == GlassTier.SOLID) return;
+        if (tier == GlassTier.SOLID) return;
+        // Primary path: sample PortalShaderView's live blurred starfield bitmap directly inside the rounded clip
+        if (AppThemePalette.isLiveBlurEffective(getContext()) && !PortalBackgroundHelper.isRobolectric()) {
+            android.app.Activity act = PortalBackgroundHelper.activityOf(getContext());
+            PortalShaderView psv = PortalBackgroundHelper.getShaderView(act);
+            if (psv != null) {
+                ensurePortalLiveListener();
+                android.graphics.Bitmap bmp = psv.getBlurredBitmap();
+                if (bmp != null && !bmp.isRecycled()) {
+                    getLocationOnScreen(screenLoc);
+                    int screenW = getResources().getDisplayMetrics().widthPixels;
+                    int screenH = getResources().getDisplayMetrics().heightPixels;
+                    if (screenW > 0 && screenH > 0) {
+                        int satPct = com.limelight.preferences.PreferenceConfiguration
+                                .readPreferences(getContext()).blurSaturationPercent;
+                        android.graphics.ColorMatrix cm = new android.graphics.ColorMatrix();
+                        cm.setSaturation(Math.max(0f, Math.min(3f, satPct / 100f)));
+                        portalBlurPaint.setColorFilter(new ColorMatrixColorFilter(cm));
+                        canvas.save();
+                        canvas.clipPath(shape);
+                        portalDst.set(-screenLoc[0], -screenLoc[1], screenW - screenLoc[0], screenH - screenLoc[1]);
+                        canvas.drawBitmap(bmp, null, portalDst, portalBlurPaint);
+                        canvas.restore();
+                        return;
+                    }
+                }
+            }
+        }
+        if (host == null) return;
         if (tier == GlassTier.BAKED) {
             canvas.save();
             canvas.clipPath(shape);
@@ -285,17 +337,14 @@ public class GlassSurface extends FrameLayout {
     private void drawLive(Canvas canvas) {
         RenderNode blur = host.blurNode(spec);
         if (blur == null) {
-            // The very first frame: fill only. The next one has the blur.
             post(invalidator);
             return;
         }
         if (nodesStale || glassNode == null) {
             recordGlass(blur);
-            if (tier == GlassTier.LENS && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) recordLens();
             nodesStale = false;
         }
         canvas.drawRenderNode((RenderNode) glassNode);
-        if (lensNode != null && tier == GlassTier.LENS) canvas.drawRenderNode((RenderNode) lensNode);
     }
 
     @RequiresApi(Build.VERSION_CODES.S)

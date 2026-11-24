@@ -81,14 +81,8 @@ final class PageBlur {
      * before Android 12, or for a dialog no activity owns.
      */
     static PageBlur behind(Dialog dialog) {
-        Window window = dialog.getWindow();
-        Activity owner = StreamGlass.activityOf(dialog.getContext());
-        if (window == null || owner == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null;
-        if (StreamGlass.overStream(owner)) return null;
-        PageBlur blur = new PageBlur(window, owner);
-        blur.refresh();
-        blur.follow(window.getDecorView());
-        return blur;
+        // One UI card-only blur: never blur the entire screen behind a popup/dialog.
+        return null;
     }
 
     private PageBlur(Window window, Activity owner) {

@@ -1998,6 +1998,14 @@ public class PreferenceConfiguration {
     public static final String UI_PERFORMANCE_MODE_PREF_STRING = "checkbox_ui_performance_mode";
     public static final String UI_BATTERY_SAVER_PREF_STRING = "list_ui_battery_saver";
     public static final String PORTAL_SHOW_COVER_BACKDROP_PREF_STRING = "checkbox_portal_show_cover_backdrop";
+    public static final String OSC_ENGINE_PREF_STRING = "list_osc_engine";
+    public static final String OSC_ENGINE_MOONLIGHT = "moonlight";
+    public static final String OSC_ENGINE_NIGHTJAR = "nightjar";
+    public static final String OSC_LIVE_BLUR_PREF_STRING = "checkbox_osc_live_blur";
+    public static final String OSC_BLUR_AMOUNT_PREF_STRING = "seekbar_osc_blur_amount";
+    public static final String OSC_BLUR_RESOLUTION_PERCENT_PREF_STRING = "seekbar_osc_blur_resolution_percent";
+    public static final String OSC_BLUR_FRAMERATE_PREF_STRING = "list_osc_blur_framerate";
+    public static final String OSC_OUTLINE_THICKNESS_PREF_STRING = "seekbar_osc_outline_thickness";
 
     public static final int DEFAULT_PORTAL_READY_MS = 450;
     public static final int DEFAULT_PORTAL_CHARGE_MS = 1300;
@@ -2035,6 +2043,12 @@ public class PreferenceConfiguration {
     public static final boolean DEFAULT_UI_PERFORMANCE_MODE = false;
     public static final String DEFAULT_UI_BATTERY_SAVER = "auto";
     public static final boolean DEFAULT_PORTAL_SHOW_COVER_BACKDROP = false;
+    public static final String DEFAULT_OSC_ENGINE = OSC_ENGINE_MOONLIGHT;
+    public static final boolean DEFAULT_OSC_LIVE_BLUR = false;
+    public static final int DEFAULT_OSC_BLUR_AMOUNT = 60;
+    public static final int DEFAULT_OSC_BLUR_RESOLUTION_PERCENT = 15;
+    public static final String DEFAULT_OSC_BLUR_FRAMERATE = "60";
+    public static final int DEFAULT_OSC_OUTLINE_THICKNESS = 100;
 
     public int portalReadyMs;
     public int portalChargeMs;
@@ -2074,6 +2088,15 @@ public class PreferenceConfiguration {
     public boolean isUiBatterySaverEffective;
     public boolean isUiPerformanceModeEffective;
     public boolean portalShowCoverBackdrop;
+    public String oscEngine;
+    public boolean oscLiveBlur;
+    public int oscBlurAmountPercent;
+    public int oscBlurResolutionPercent;
+    public String oscBlurFramerate;
+    public int oscOutlineThicknessPercent;
+    public boolean enableNewAnalogStick;
+    public boolean enableOnScreenStyleOfficial;
+    public boolean enableKeyboardSquare;
 
     private static volatile long sLastPowerSaveCheckMs = 0L;
     private static volatile boolean sLastPowerSaveState = false;
@@ -2135,6 +2158,17 @@ public class PreferenceConfiguration {
         config.isUiBatterySaverEffective = isUiBatterySaverEffective(context, config.uiBatterySaverMode);
         config.isUiPerformanceModeEffective = config.uiPerformanceMode && !config.isUiBatterySaverEffective;
         config.portalShowCoverBackdrop = prefs.getBoolean(PORTAL_SHOW_COVER_BACKDROP_PREF_STRING, DEFAULT_PORTAL_SHOW_COVER_BACKDROP);
+        config.oscEngine = prefs.getString(OSC_ENGINE_PREF_STRING, DEFAULT_OSC_ENGINE);
+        config.oscLiveBlur = prefs.getBoolean(OSC_LIVE_BLUR_PREF_STRING, DEFAULT_OSC_LIVE_BLUR);
+        config.oscBlurAmountPercent = Math.max(0, Math.min(100,
+                prefs.getInt(OSC_BLUR_AMOUNT_PREF_STRING, DEFAULT_OSC_BLUR_AMOUNT)));
+        config.oscBlurResolutionPercent = Math.max(5, Math.min(50,
+                prefs.getInt(OSC_BLUR_RESOLUTION_PERCENT_PREF_STRING, DEFAULT_OSC_BLUR_RESOLUTION_PERCENT)));
+        config.oscBlurFramerate = prefs.getString(OSC_BLUR_FRAMERATE_PREF_STRING, DEFAULT_OSC_BLUR_FRAMERATE);
+        config.oscOutlineThicknessPercent = prefs.getInt(OSC_OUTLINE_THICKNESS_PREF_STRING, DEFAULT_OSC_OUTLINE_THICKNESS);
+        config.enableNewAnalogStick = prefs.getBoolean("checkbox_enable_analog_stick_new", false);
+        config.enableOnScreenStyleOfficial = prefs.getBoolean("checkbox_onscreen_style_official", false);
+        config.enableKeyboardSquare = prefs.getBoolean("checkbox_keyboard_square", false);
     }
 
     public static boolean isUiBatterySaverEffective(Context context) {

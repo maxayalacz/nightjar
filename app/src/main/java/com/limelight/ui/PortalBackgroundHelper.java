@@ -186,7 +186,7 @@ public final class PortalBackgroundHelper {
         }
     }
 
-    /** Smoothly fades out foreground, captures starfield handoff, and launches the next menu activity. */
+    /** Smoothly fades out foreground UI (keeping PortalShaderView at alpha=1), captures handoff, and launches next menu. */
     public static void startMenuActivityWithDepth(Activity from, Intent intent, Runnable launchAction) {
         if (from == null || intent == null || launchAction == null || from.isFinishing() || isRobolectric()) {
             if (launchAction != null) launchAction.run();
@@ -199,49 +199,54 @@ public final class PortalBackgroundHelper {
             UiHelper.disableActivityTransition(from, false);
             return;
         }
-        final View fg = getForegroundRoot(content, findShaderView(content), content.findViewWithTag(PORTAL_HANDOFF_TAG));
-        if (fg == null) {
+        java.util.List<View> fgs = collectForegroundViews(content, findShaderView(content), content.findViewWithTag(PORTAL_HANDOFF_TAG));
+        if (fgs.isEmpty()) {
             captureHandoff(from);
             launchAction.run();
             UiHelper.disableActivityTransition(from, false);
             return;
         }
-        if (Boolean.TRUE.equals(fg.getTag(TAG_EXIT_RUNNING))) {
+        final View anchor = fgs.get(0);
+        if (Boolean.TRUE.equals(anchor.getTag(TAG_EXIT_RUNNING))) {
             return;
         }
         final int gen = sAnimGen.incrementAndGet();
-        fg.animate().setListener(null).cancel();
-        fg.setTag(TAG_ANIM_GEN, gen);
-        fg.setTag(TAG_ENTER_RUNNING, null);
-        fg.setTag(TAG_EXIT_RUNNING, Boolean.TRUE);
-        if (fg.getWidth() > 0 && fg.getHeight() > 0) {
-            fg.setPivotX(fg.getWidth() * 0.5f);
-            fg.setPivotY(fg.getHeight() * 0.5f);
-        }
-        fg.animate()
-                .alpha(0f)
-                .scaleX(1.035f)
-                .scaleY(1.035f)
-                .setDuration(140L)
-                .setInterpolator(new PathInterpolator(0.4f, 0f, 1f, 1f))
-                .withLayer()
-                .setListener(new AnimatorListenerAdapter() {
+        anchor.setTag(TAG_ANIM_GEN, gen);
+        anchor.setTag(TAG_ENTER_RUNNING, null);
+        anchor.setTag(TAG_EXIT_RUNNING, Boolean.TRUE);
+
+        for (int i = 0; i < fgs.size(); i++) {
+            final View fg = fgs.get(i);
+            fg.animate().setListener(null).cancel();
+            if (fg.getWidth() > 0 && fg.getHeight() > 0) {
+                fg.setPivotX(fg.getWidth() * 0.5f);
+                fg.setPivotY(fg.getHeight() * 0.5f);
+            }
+            android.view.ViewPropertyAnimator anim = fg.animate()
+                    .alpha(0f)
+                    .scaleX(1.03f)
+                    .scaleY(1.03f)
+                    .setDuration(135L)
+                    .setInterpolator(new PathInterpolator(0.4f, 0f, 1f, 1f))
+                    .withLayer();
+            if (i == 0) {
+                anim.setListener(new AnimatorListenerAdapter() {
                     private boolean canceled = false;
 
                     @Override
                     public void onAnimationCancel(Animator animation) {
                         canceled = true;
-                        fg.animate().setListener(null);
-                        if (Integer.valueOf(gen).equals(fg.getTag(TAG_ANIM_GEN))) {
-                            fg.setTag(TAG_EXIT_RUNNING, null);
+                        anchor.animate().setListener(null);
+                        if (Integer.valueOf(gen).equals(anchor.getTag(TAG_ANIM_GEN))) {
+                            anchor.setTag(TAG_EXIT_RUNNING, null);
                         }
                     }
 
                     @Override
                     public void onAnimationEnd(Animator animation) {
-                        fg.animate().setListener(null);
-                        if (Integer.valueOf(gen).equals(fg.getTag(TAG_ANIM_GEN))) {
-                            fg.setTag(TAG_EXIT_RUNNING, null);
+                        anchor.animate().setListener(null);
+                        if (Integer.valueOf(gen).equals(anchor.getTag(TAG_ANIM_GEN))) {
+                            anchor.setTag(TAG_EXIT_RUNNING, null);
                         }
                         if (!canceled && !from.isFinishing()) {
                             captureHandoff(from);
@@ -249,11 +254,13 @@ public final class PortalBackgroundHelper {
                             UiHelper.disableActivityTransition(from, false);
                         }
                     }
-                })
-                .start();
+                });
+            }
+            anim.start();
+        }
     }
 
-    /** Smoothly fades out foreground, captures starfield handoff, and finishes the menu activity. */
+    /** Smoothly fades out foreground UI (keeping PortalShaderView at alpha=1), captures handoff, and finishes. */
     public static void finishMenuWithDepth(Activity activity, Runnable superFinish) {
         if (activity == null || superFinish == null || isRobolectric()) {
             if (superFinish != null) superFinish.run();
@@ -266,49 +273,54 @@ public final class PortalBackgroundHelper {
             superFinish.run();
             return;
         }
-        final View fg = getForegroundRoot(content, findShaderView(content), content.findViewWithTag(PORTAL_HANDOFF_TAG));
-        if (fg == null) {
+        java.util.List<View> fgs = collectForegroundViews(content, findShaderView(content), content.findViewWithTag(PORTAL_HANDOFF_TAG));
+        if (fgs.isEmpty()) {
             captureHandoff(activity);
             UiHelper.disableActivityTransition(activity, true);
             superFinish.run();
             return;
         }
-        if (Boolean.TRUE.equals(fg.getTag(TAG_EXIT_RUNNING))) {
+        final View anchor = fgs.get(0);
+        if (Boolean.TRUE.equals(anchor.getTag(TAG_EXIT_RUNNING))) {
             return;
         }
         final int gen = sAnimGen.incrementAndGet();
-        fg.animate().setListener(null).cancel();
-        fg.setTag(TAG_ANIM_GEN, gen);
-        fg.setTag(TAG_ENTER_RUNNING, null);
-        fg.setTag(TAG_EXIT_RUNNING, Boolean.TRUE);
-        if (fg.getWidth() > 0 && fg.getHeight() > 0) {
-            fg.setPivotX(fg.getWidth() * 0.5f);
-            fg.setPivotY(fg.getHeight() * 0.5f);
-        }
-        fg.animate()
-                .alpha(0f)
-                .scaleX(0.965f)
-                .scaleY(0.965f)
-                .setDuration(135L)
-                .setInterpolator(new PathInterpolator(0.4f, 0f, 1f, 1f))
-                .withLayer()
-                .setListener(new AnimatorListenerAdapter() {
+        anchor.setTag(TAG_ANIM_GEN, gen);
+        anchor.setTag(TAG_ENTER_RUNNING, null);
+        anchor.setTag(TAG_EXIT_RUNNING, Boolean.TRUE);
+
+        for (int i = 0; i < fgs.size(); i++) {
+            final View fg = fgs.get(i);
+            fg.animate().setListener(null).cancel();
+            if (fg.getWidth() > 0 && fg.getHeight() > 0) {
+                fg.setPivotX(fg.getWidth() * 0.5f);
+                fg.setPivotY(fg.getHeight() * 0.5f);
+            }
+            android.view.ViewPropertyAnimator anim = fg.animate()
+                    .alpha(0f)
+                    .scaleX(0.97f)
+                    .scaleY(0.97f)
+                    .setDuration(130L)
+                    .setInterpolator(new PathInterpolator(0.4f, 0f, 1f, 1f))
+                    .withLayer();
+            if (i == 0) {
+                anim.setListener(new AnimatorListenerAdapter() {
                     private boolean canceled = false;
 
                     @Override
                     public void onAnimationCancel(Animator animation) {
                         canceled = true;
-                        fg.animate().setListener(null);
-                        if (Integer.valueOf(gen).equals(fg.getTag(TAG_ANIM_GEN))) {
-                            fg.setTag(TAG_EXIT_RUNNING, null);
+                        anchor.animate().setListener(null);
+                        if (Integer.valueOf(gen).equals(anchor.getTag(TAG_ANIM_GEN))) {
+                            anchor.setTag(TAG_EXIT_RUNNING, null);
                         }
                     }
 
                     @Override
                     public void onAnimationEnd(Animator animation) {
-                        fg.animate().setListener(null);
-                        if (Integer.valueOf(gen).equals(fg.getTag(TAG_ANIM_GEN))) {
-                            fg.setTag(TAG_EXIT_RUNNING, null);
+                        anchor.animate().setListener(null);
+                        if (Integer.valueOf(gen).equals(anchor.getTag(TAG_ANIM_GEN))) {
+                            anchor.setTag(TAG_EXIT_RUNNING, null);
                         }
                         if (!canceled) {
                             captureHandoff(activity);
@@ -316,71 +328,82 @@ public final class PortalBackgroundHelper {
                             superFinish.run();
                         }
                     }
-                })
-                .start();
+                });
+            }
+            anim.start();
+        }
     }
 
     private static void animateForegroundEnter(Activity activity, boolean returning) {
         ViewGroup content = activity.findViewById(android.R.id.content);
         if (content == null) return;
-        final View fg = getForegroundRoot(content, findShaderView(content), content.findViewWithTag(PORTAL_HANDOFF_TAG));
-        if (fg == null) return;
-        if (!returning && Boolean.TRUE.equals(fg.getTag(TAG_ENTER_PLAYED))) return;
-        fg.setTag(TAG_ENTER_PLAYED, Boolean.TRUE);
+        final java.util.List<View> fgs = collectForegroundViews(content, findShaderView(content), content.findViewWithTag(PORTAL_HANDOFF_TAG));
+        if (fgs.isEmpty()) return;
+        final View anchor = fgs.get(0);
+        if (!returning && Boolean.TRUE.equals(anchor.getTag(TAG_ENTER_PLAYED))) return;
+        anchor.setTag(TAG_ENTER_PLAYED, Boolean.TRUE);
 
         final int gen = sAnimGen.incrementAndGet();
-        fg.animate().setListener(null).cancel();
-        fg.setTag(TAG_ANIM_GEN, gen);
-        fg.setTag(TAG_EXIT_RUNNING, null);
-        fg.setTag(TAG_ENTER_RUNNING, Boolean.TRUE);
-        fg.setAlpha(0f);
-        float startScale = returning ? 1.03f : 0.97f;
-        fg.setScaleX(startScale);
-        fg.setScaleY(startScale);
+        anchor.setTag(TAG_ANIM_GEN, gen);
+        anchor.setTag(TAG_EXIT_RUNNING, null);
+        anchor.setTag(TAG_ENTER_RUNNING, Boolean.TRUE);
+
+        float startScale = returning ? 1.025f : 0.975f;
+        for (View fg : fgs) {
+            fg.animate().setListener(null).cancel();
+            fg.setAlpha(0f);
+            fg.setScaleX(startScale);
+            fg.setScaleY(startScale);
+        }
 
         final Runnable startAnim = () -> {
-            if (!Integer.valueOf(gen).equals(fg.getTag(TAG_ANIM_GEN))) return;
-            if (fg.getWidth() > 0 && fg.getHeight() > 0) {
-                fg.setPivotX(fg.getWidth() * 0.5f);
-                fg.setPivotY(fg.getHeight() * 0.5f);
-            }
-            fg.animate()
-                    .alpha(1f)
-                    .scaleX(1f)
-                    .scaleY(1f)
-                    .setDuration(210L)
-                    .setInterpolator(new PathInterpolator(0.22f, 1f, 0.36f, 1f))
-                    .withLayer()
-                    .setListener(new AnimatorListenerAdapter() {
+            if (!Integer.valueOf(gen).equals(anchor.getTag(TAG_ANIM_GEN))) return;
+            for (int i = 0; i < fgs.size(); i++) {
+                final View fg = fgs.get(i);
+                if (fg.getWidth() > 0 && fg.getHeight() > 0) {
+                    fg.setPivotX(fg.getWidth() * 0.5f);
+                    fg.setPivotY(fg.getHeight() * 0.5f);
+                }
+                android.view.ViewPropertyAnimator anim = fg.animate()
+                        .alpha(1f)
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(200L)
+                        .setInterpolator(new PathInterpolator(0.22f, 1f, 0.36f, 1f))
+                        .withLayer();
+                if (i == 0) {
+                    anim.setListener(new AnimatorListenerAdapter() {
                         @Override
                         public void onAnimationEnd(Animator animation) {
-                            fg.animate().setListener(null);
-                            if (Integer.valueOf(gen).equals(fg.getTag(TAG_ANIM_GEN))) {
-                                fg.setTag(TAG_ENTER_RUNNING, null);
+                            anchor.animate().setListener(null);
+                            if (Integer.valueOf(gen).equals(anchor.getTag(TAG_ANIM_GEN))) {
+                                anchor.setTag(TAG_ENTER_RUNNING, null);
                             }
                         }
 
                         @Override
                         public void onAnimationCancel(Animator animation) {
-                            fg.animate().setListener(null);
-                            if (Integer.valueOf(gen).equals(fg.getTag(TAG_ANIM_GEN))) {
-                                fg.setTag(TAG_ENTER_RUNNING, null);
+                            anchor.animate().setListener(null);
+                            if (Integer.valueOf(gen).equals(anchor.getTag(TAG_ANIM_GEN))) {
+                                anchor.setTag(TAG_ENTER_RUNNING, null);
                             }
                         }
-                    })
-                    .start();
+                    });
+                }
+                anim.start();
+            }
         };
 
-        if (fg.getWidth() > 0 && fg.getHeight() > 0) {
-            fg.postOnAnimation(startAnim);
+        if (anchor.getWidth() > 0 && anchor.getHeight() > 0) {
+            anchor.postOnAnimation(startAnim);
         } else {
-            fg.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            anchor.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
                 @Override
                 public boolean onPreDraw() {
-                    if (fg.getViewTreeObserver().isAlive()) {
-                        fg.getViewTreeObserver().removeOnPreDrawListener(this);
+                    if (anchor.getViewTreeObserver().isAlive()) {
+                        anchor.getViewTreeObserver().removeOnPreDrawListener(this);
                     }
-                    fg.postOnAnimation(startAnim);
+                    anchor.postOnAnimation(startAnim);
                     return true;
                 }
             });
@@ -390,18 +413,54 @@ public final class PortalBackgroundHelper {
     private static void restoreForegroundIfNeeded(Activity activity) {
         ViewGroup content = activity.findViewById(android.R.id.content);
         if (content == null) return;
-        final View fg = getForegroundRoot(content, findShaderView(content), content.findViewWithTag(PORTAL_HANDOFF_TAG));
-        if (fg == null) return;
-        fg.setTag(TAG_EXIT_RUNNING, null);
-        if (Boolean.TRUE.equals(fg.getTag(TAG_ENTER_RUNNING))) return;
+        java.util.List<View> fgs = collectForegroundViews(content, findShaderView(content), content.findViewWithTag(PORTAL_HANDOFF_TAG));
+        if (fgs.isEmpty()) return;
+        final View anchor = fgs.get(0);
+        anchor.setTag(TAG_EXIT_RUNNING, null);
+        if (Boolean.TRUE.equals(anchor.getTag(TAG_ENTER_RUNNING))) return;
         if (sReturningFromStream) {
             sReturningFromStream = false;
             animateForegroundEnter(activity, true);
             return;
         }
-        if (fg.getAlpha() < 0.99f || Math.abs(fg.getScaleX() - 1f) > 0.005f) {
+        if (anchor.getAlpha() < 0.99f || Math.abs(anchor.getScaleX() - 1f) > 0.005f) {
             animateForegroundEnter(activity, true);
         }
+    }
+
+    /** Returns only foreground UI views, never GlassHost itself or PortalShaderView/handoffView. */
+    private static java.util.List<View> collectForegroundViews(ViewGroup content, @Nullable View shaderView, @Nullable View handoffView) {
+        java.util.List<View> result = new java.util.ArrayList<>();
+        for (int i = 0; i < content.getChildCount(); i++) {
+            View child = content.getChildAt(i);
+            if (isBgView(child, shaderView, handoffView)) continue;
+            if (child instanceof GlassHost) {
+                GlassHost host = (GlassHost) child;
+                for (int j = 0; j < host.getChildCount(); j++) {
+                    View hc = host.getChildAt(j);
+                    if (j == 0 && hc instanceof ViewGroup) {
+                        ViewGroup layer0 = (ViewGroup) hc;
+                        for (int k = 0; k < layer0.getChildCount(); k++) {
+                            View c0 = layer0.getChildAt(k);
+                            if (!isBgView(c0, shaderView, handoffView) && !(c0 instanceof NightSkyView) && !(c0 instanceof BackdropView)) {
+                                result.add(c0);
+                            }
+                        }
+                    } else if (!isBgView(hc, shaderView, handoffView)) {
+                        result.add(hc);
+                    }
+                }
+            } else {
+                result.add(child);
+            }
+        }
+        return result;
+    }
+
+    private static boolean isBgView(View v, @Nullable View shaderView, @Nullable View handoffView) {
+        return v == shaderView || v == handoffView
+                || PORTAL_BG_TAG.equals(v.getTag())
+                || PORTAL_HANDOFF_TAG.equals(v.getTag());
     }
 
     private static void showHandoffUntilFirstFrame(Activity activity, ViewGroup content, PortalShaderView psv) {

@@ -49,6 +49,7 @@ public final class GlassPanelDrawable extends Drawable {
     }
 
     void refreshTheme(Context context) {
+        this.panelContext = context;
         boolean day = isDay(context);
         spec = GlassSpec.of(context, "panel", AppTheme.isHighContrast(context) ? GlassTier.SOLID : GlassTier.BAKED, day);
         AppThemePalette palette = AppThemePalette.getCurrent(context);
@@ -188,6 +189,9 @@ public final class GlassPanelDrawable extends Drawable {
                 isDay(context) ? R.dimen.nj_day_sheet_backdrop_brightness : R.dimen.nj_sheet_backdrop_brightness);
     }
 
+    private Context panelContext;
+    private final Paint blurPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
+
     @Override
     protected void onBoundsChange(Rect bounds) {
         float inset = spec.rimWidth / 2f;
@@ -198,28 +202,39 @@ public final class GlassPanelDrawable extends Drawable {
         rimShape.reset();
         rimShape.addRoundRect(new RectF(bounds.left + inset, bounds.top + inset, bounds.right - inset, bounds.bottom - inset),
                 inner, Path.Direction.CW);
-        int h = bounds.height();
-        if (h == 0) return;
-        sheen.setShader(spec.sheenEnd <= 0f ? null : new LinearGradient(0, bounds.top, 0, bounds.bottom,
-                new int[] {spec.sheenTop, spec.sheenTop & 0xFFFFFF, spec.sheenTop & 0xFFFFFF}, new float[] {0f, spec.sheenEnd, 1f},
-                Shader.TileMode.CLAMP));
-        // Lit from above and slightly from the left, as the glass surfaces are.
-        double angle = Math.toRadians(168);
-        float dx = (float) Math.sin(angle);
-        float dy = (float) -Math.cos(angle);
-        float length = Math.abs(bounds.width() * dx) + Math.abs(h * dy);
-        float cx = bounds.exactCenterX();
-        float cy = bounds.exactCenterY();
-        rim.setShader(new LinearGradient(cx - dx * length / 2f, cy - dy * length / 2f, cx + dx * length / 2f, cy + dy * length / 2f,
-                new int[] {spec.rimTop, spec.rimMid, spec.rimMid, spec.rimBottom}, new float[] {0f, 0.34f, 0.62f, 1f}, Shader.TileMode.CLAMP));
+        rim.setShader(null);
     }
 
     @Override
     public void draw(Canvas canvas) {
+        Context ctx = panelContext != null ? panelContext : menuContext;
+        if (!overStream && ctx != null && AppThemePalette.isLiveBlurEffective(ctx) && !PortalBackgroundHelper.isRobolectric()) {
+            android.app.Activity act = PortalBackgroundHelper.activityOf(ctx);
+            PortalShaderView psv = PortalBackgroundHelper.getShaderView(act);
+            if (psv != null) {
+                android.graphics.Bitmap bmp = psv.getBlurredBitmap();
+                if (bmp != null && !bmp.isRecycled()) {
+                    int satPct = com.limelight.preferences.PreferenceConfiguration
+                            .readPreferences(ctx).blurSaturationPercent;
+                    android.graphics.ColorMatrix cm = new android.graphics.ColorMatrix();
+                    cm.setSaturation(Math.max(0f, Math.min(3f, satPct / 100f)));
+                    blurPaint.setColorFilter(new android.graphics.ColorMatrixColorFilter(cm));
+                    canvas.save();
+                    canvas.clipPath(shape);
+                    canvas.drawBitmap(bmp, null, getBounds(), blurPaint);
+                    canvas.restore();
+                }
+            }
+        }
         canvas.drawPath(shape, fill);
-        if (spec.sheenEnd > 0f) canvas.drawPath(shape, sheen);
-        canvas.drawPath(rimShape, rim);
-        if (spec.hairline != 0) canvas.drawPath(shape, hairline);
+        if (spec.rimWidth > 0f) {
+            rim.setShader(null);
+            if (ctx != null) {
+                rim.setColor(AppThemePalette.getCurrent(ctx).getCardRimColor());
+            }
+            rim.setStrokeWidth(spec.rimWidth);
+            canvas.drawPath(rimShape, rim);
+        }
     }
 
     /** The rim keeps a black panel apart from a black page. */

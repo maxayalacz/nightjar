@@ -154,6 +154,21 @@ public final class ShellBar {
         if (home != null) {
             home.setVisibility(home.isSelected() || homeAvailable(activity) ? View.VISIBLE : View.GONE);
         }
+        ViewGroup items = activity.findViewById(R.id.shell_bar_items);
+        if (items != null) {
+            AppThemePalette palette = AppThemePalette.getCurrent(activity);
+            int[][] states = new int[][] { new int[] { android.R.attr.state_selected }, new int[] {} };
+            android.content.res.ColorStateList colorState = new android.content.res.ColorStateList(
+                    states, new int[] { palette.highlight, palette.getSecondaryTextColor() });
+            for (int i = 0; i < items.getChildCount(); i++) {
+                View child = items.getChildAt(i);
+                if (child instanceof MaterialButton) {
+                    MaterialButton mb = (MaterialButton) child;
+                    mb.setTextColor(colorState);
+                    mb.setIconTint(colorState);
+                }
+            }
+        }
     }
 
     /**

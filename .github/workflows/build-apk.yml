@@ -1,4 +1,4 @@
-name: Build Debug APK
+name: Build Release APK
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Build Debug APK
+    name: Build Release APK (arm64-v8a)
     runs-on: ubuntu-latest
 
     steps:
@@ -38,15 +38,37 @@ jobs:
       - name: Setup Rust Android target
         run: rustup target add aarch64-linux-android
 
+      - name: Configure consistent release signing (updateable APK)
+        env:
+          SECRET_KEYSTORE_B64: ${{ secrets.BP_KEYSTORE_BASE64 }}
+          SECRET_STORE_PASS: ${{ secrets.BP_KEYSTORE_PASSWORD }}
+          SECRET_KEY_ALIAS: ${{ secrets.BP_KEY_ALIAS }}
+          SECRET_KEY_PASS: ${{ secrets.BP_KEY_PASSWORD }}
+        run: |
+          if [ -n "$SECRET_KEYSTORE_B64" ] && [ -n "$SECRET_STORE_PASS" ] && [ -n "$SECRET_KEY_ALIAS" ] && [ -n "$SECRET_KEY_PASS" ]; then
+            echo "$SECRET_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "BP_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "BP_KEYSTORE_PASSWORD=$SECRET_STORE_PASS" >> "$GITHUB_ENV"
+            echo "BP_KEY_ALIAS=$SECRET_KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "BP_KEY_PASSWORD=$SECRET_KEY_PASS" >> "$GITHUB_ENV"
+            echo "Using repository release signing secrets."
+          else
+            echo "BP_KEYSTORE=${GITHUB_WORKSPACE}/app/dev-release.jks" >> "$GITHUB_ENV"
+            echo "BP_KEYSTORE_PASSWORD=nightjarfork123" >> "$GITHUB_ENV"
+            echo "BP_KEY_ALIAS=nightjar-fork" >> "$GITHUB_ENV"
+            echo "BP_KEY_PASSWORD=nightjarfork123" >> "$GITHUB_ENV"
+            echo "Using committed dev-release.jks for consistent updateable builds."
+          fi
+
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Build Debug APK
-        run: ./gradlew assembleNonRootDebug -PabiFilters=arm64-v8a --stacktrace
+      - name: Build Release APK
+        run: ./gradlew assembleNonRootRelease -PabiFilters=arm64-v8a --stacktrace
 
-      - name: Upload Debug APK
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: nightjar-nonroot-arm64-debug-apk
-          path: app/build/outputs/apk/nonRoot/debug/*.apk
+          name: nightjar-nonroot-arm64-release-apk
+          path: app/build/outputs/apk/nonRoot/release/*.apk
           if-no-files-found: error

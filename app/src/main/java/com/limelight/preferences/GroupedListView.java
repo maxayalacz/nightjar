@@ -90,21 +90,80 @@ public final class GroupedListView extends ListView {
         super.dispatchDraw(canvas);
     }
 
+    private final Paint blurPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
+    private final android.graphics.Path clipPath = new android.graphics.Path();
+    private final int[] screenLoc = new int[2];
+    private final android.graphics.Rect portalDst = new android.graphics.Rect();
+    private android.graphics.drawable.Drawable portalTickListener;
+
+    private void ensurePortalListener() {
+        if (portalTickListener != null) return;
+        android.app.Activity act = com.limelight.ui.PortalBackgroundHelper.activityOf(getContext());
+        com.limelight.ui.PortalShaderView psv = com.limelight.ui.PortalBackgroundHelper.getShaderView(act);
+        if (psv == null) return;
+        portalTickListener = new android.graphics.drawable.Drawable() {
+            @Override public void draw(Canvas canvas) { }
+            @Override public void setAlpha(int alpha) { }
+            @Override public void setColorFilter(android.graphics.ColorFilter cf) { }
+            @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
+            @Override public void invalidateSelf() { GroupedListView.this.postInvalidateOnAnimation(); }
+        };
+        psv.registerFrostedDrawable(portalTickListener);
+    }
+
     private void drawGroup(Canvas canvas, int first, int from, int to) {
+        Context ctx = getContext();
+        com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(ctx);
+        fill.setColor(palette.getFrostedCardTint(0x52121826));
+        float outlineScale = Math.max(0f, PreferenceConfiguration.readPreferences(ctx).cardOutlineThicknessPercent / 100f);
+        rim.setStrokeWidth(outlineScale <= 0f ? 0f
+                : Math.max(1f, TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 1f, getResources().getDisplayMetrics()) * outlineScale));
+        rim.setColor(palette.getCardRimColor());
+        hairline.setColor((0x38 << 24) | (palette.cardOutline & 0x00FFFFFF));
+
         View top = getChildAt(from);
         View bottom = getChildAt(to);
-        // A group running past the list's edge keeps its corners out of sight.
-        // A row cut at the edge, or dropped there while scrolling, never closes the card on screen.
         float y0 = grouped(first + from - 1) ? Math.min(top.getTop(), 0) - radius * 2 : top.getTop();
         float y1 = grouped(first + to + 1) ? Math.max(bottom.getBottom(), getHeight()) + radius * 2 : bottom.getBottom();
         box.set(top.getLeft(), y0, top.getRight(), y1);
+
+        if (com.limelight.ui.AppThemePalette.isLiveBlurEffective(ctx)) {
+            android.app.Activity act = com.limelight.ui.PortalBackgroundHelper.activityOf(ctx);
+            com.limelight.ui.PortalShaderView psv = com.limelight.ui.PortalBackgroundHelper.getShaderView(act);
+            if (psv != null) {
+                ensurePortalListener();
+                android.graphics.Bitmap bmp = psv.getBlurredBitmap();
+                if (bmp != null && !bmp.isRecycled()) {
+                    getLocationOnScreen(screenLoc);
+                    int screenW = getResources().getDisplayMetrics().widthPixels;
+                    int screenH = getResources().getDisplayMetrics().heightPixels;
+                    if (screenW > 0 && screenH > 0) {
+                        int satPct = PreferenceConfiguration.readPreferences(ctx).blurSaturationPercent;
+                        android.graphics.ColorMatrix cm = new android.graphics.ColorMatrix();
+                        cm.setSaturation(Math.max(0f, Math.min(3f, satPct / 100f)));
+                        blurPaint.setColorFilter(new android.graphics.ColorMatrixColorFilter(cm));
+                        clipPath.reset();
+                        clipPath.addRoundRect(box, radius, radius, android.graphics.Path.Direction.CW);
+                        canvas.save();
+                        canvas.clipPath(clipPath);
+                        portalDst.set(-screenLoc[0], -screenLoc[1], screenW - screenLoc[0], screenH - screenLoc[1]);
+                        canvas.drawBitmap(bmp, null, portalDst, blurPaint);
+                        canvas.restore();
+                    }
+                }
+            }
+        }
+
         canvas.drawRoundRect(box, radius, radius, fill);
-        float half = rim.getStrokeWidth() / 2;
-        box.inset(half, half);
-        canvas.drawRoundRect(box, radius, radius, rim);
+        float half = rim.getStrokeWidth() / 2f;
+        if (half > 0f) {
+            box.inset(half, half);
+            canvas.drawRoundRect(box, Math.max(0f, radius - half), Math.max(0f, radius - half), rim);
+        }
+        float divH = Math.max(1f, TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 0.75f, getResources().getDisplayMetrics()));
         for (int i = from + 1; i <= to; i++) {
             View row = getChildAt(i);
-            canvas.drawRect(row.getLeft() + inset, row.getTop(), row.getRight() - inset, row.getTop() + half * 2, hairline);
+            canvas.drawRect(row.getLeft() + inset, row.getTop(), row.getRight() - inset, row.getTop() + divH, hairline);
         }
     }
 }

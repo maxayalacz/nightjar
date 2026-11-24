@@ -60,6 +60,8 @@ public abstract class NightjarActivity extends AppCompatActivity {
     };
 
     private boolean finishingWithDepth = false;
+    private boolean pendingFinishAfterStart = false;
+    private boolean depthStartInFlight = false;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -78,8 +80,18 @@ public abstract class NightjarActivity extends AppCompatActivity {
             boolean isGame = comp != null && (comp.getClassName().endsWith(".Game")
                     || comp.getClassName().endsWith(".GameSecondary"));
             if (isInternal && !isGame) {
-                PortalBackgroundHelper.startMenuActivityWithDepth(this, intent,
-                        () -> super.startActivity(intent, options));
+                depthStartInFlight = true;
+                pendingFinishAfterStart = false;
+                PortalBackgroundHelper.startMenuActivityWithDepth(this, intent, () -> {
+                    depthStartInFlight = false;
+                    super.startActivity(intent, options);
+                    if (pendingFinishAfterStart) {
+                        pendingFinishAfterStart = false;
+                        finishingWithDepth = true;
+                        super.finish();
+                        com.limelight.utils.UiHelper.disableActivityTransition(NightjarActivity.this, true);
+                    }
+                });
                 return;
             }
             if (isGame) {
@@ -95,6 +107,10 @@ public abstract class NightjarActivity extends AppCompatActivity {
 
     @Override
     public void finish() {
+        if (depthStartInFlight) {
+            pendingFinishAfterStart = true;
+            return;
+        }
         if (!PortalBackgroundHelper.isRobolectric() && !finishingWithDepth
                 && !recreatingForTheme && !recreatingForForm && !isDestroyed()) {
             finishingWithDepth = true;

@@ -593,10 +593,29 @@ public class StreamSettings extends NightjarActivity {
                 chips.addView(chip);
             }
         }
+        com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(this);
+        com.limelight.ui.PortalShaderView psv = com.limelight.ui.PortalBackgroundHelper.getShaderView(this);
+        int onAccent = androidx.core.graphics.ColorUtils.calculateLuminance(palette.accent) > 0.45
+                ? 0xFF0B0E14 : 0xFFFFFFFF;
         for (int i = 0; i < chips.getChildCount(); i++) {
             View chip = chips.getChildAt(i);
             boolean selected = chip.getTag().equals(section);
             chip.setSelected(selected);
+            if (chip instanceof TextView) {
+                TextView tv = (TextView) chip;
+                if (selected) {
+                    android.graphics.drawable.GradientDrawable selBg = new android.graphics.drawable.GradientDrawable(
+                            android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                            new int[] { palette.highlight, palette.accent });
+                    selBg.setCornerRadius(com.limelight.utils.UiHelper.dpToPx(this, 20f));
+                    tv.setBackground(selBg);
+                    tv.setTextColor(onAccent);
+                } else {
+                    com.limelight.ui.OneUiThemeApplier.applyFrostedCard(
+                            tv, psv, com.limelight.ui.FlowingAuroraView.CornerMode.ALL, 20f);
+                    tv.setTextColor(palette.getSecondaryTextColor());
+                }
+            }
             ViewCompat.setStateDescription(chip, selected ? getString(R.string.shell_current_page) : null);
             if (selected) chip.post(() -> chip.requestRectangleOnScreen(new android.graphics.Rect(0, 0, chip.getWidth(), chip.getHeight()), true));
         }
@@ -3064,6 +3083,14 @@ public class StreamSettings extends NightjarActivity {
             if (themeStudioPref != null) {
                 themeStudioPref.setOnPreferenceClickListener(preference -> {
                     Intent intent = new Intent(getActivity(), com.limelight.ui.ThemeStudioActivity.class);
+                    startActivity(intent);
+                    return true;
+                });
+            }
+            Preference editOscPref = findPreference("edit_osc_layout");
+            if (editOscPref != null) {
+                editOscPref.setOnPreferenceClickListener(preference -> {
+                    Intent intent = new Intent(getActivity(), com.limelight.OscLayoutEditorActivity.class);
                     startActivity(intent);
                     return true;
                 });

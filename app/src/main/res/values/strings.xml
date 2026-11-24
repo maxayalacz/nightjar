@@ -637,4 +637,29 @@
     <string name="title_ui_framerate">Background &amp; Blur Framerate</string>
     <string name="title_portal_show_cover_backdrop">Game Cover Art Backdrop</string>
     <string name="summary_portal_show_cover_backdrop">Blend Nightjar\'s blurred game cover art over the Portal starfield on Home &amp; Game Detail</string>
+
+    <!-- On-Screen Controller Engine, Layout Editor & Live Blur -->
+    <string name="title_osc_engine">On-screen controller engine</string>
+    <string name="summary_osc_engine">Choose between Moonlight\'s customizable OSC layout editor or Nightjar\'s built-in PadEditor</string>
+    <string name="title_edit_osc_layout">Edit on-screen controller layout</string>
+    <string name="summary_edit_osc_layout">Customize button positions, sizes, snapping, and visibility</string>
+    <string name="title_osc_live_blur">On-screen controller live blur</string>
+    <string name="summary_osc_live_blur">Blur the live game stream behind Moonlight on-screen controller buttons</string>
+    <string name="configuration_mode_disable_enable_buttons">Tap buttons to hide or show them</string>
+    <string name="configuration_mode_move_buttons">Drag buttons to move them</string>
+    <string name="configuration_mode_resize_buttons">Drag buttons to resize them</string>
+    <string name="configuration_mode_exiting">Exiting configuration mode</string>
+    <string name="osc_editor_unsaved_title">Unsaved layout changes</string>
+    <string name="osc_editor_unsaved_msg">Save your on-screen controller layout changes before closing?</string>
+    <string name="osc_editor_save">Save</string>
+    <string name="osc_editor_discard">Discard</string>
+    <string name="osc_editor_saved">On-screen controller layout saved</string>
+    <string name="osc_editor_snap_guides">Snap: Guides</string>
+    <string name="osc_editor_snap_grid">Snap: Grid</string>
+    <string name="osc_editor_snap_off">Snap: Off</string>
+    <string name="osc_editor_show_hidden">Show Hidden</string>
+    <string name="osc_editor_reset">Reset</string>
+    <string name="osc_editor_select_hint">Tap any button to move, resize, or hide</string>
+    <string name="osc_editor_hide_btn">Hide</string>
+    <string name="osc_editor_show_btn">Show</string>
 </resources>

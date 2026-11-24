@@ -299,6 +299,23 @@
             android:title="@string/title_checkbox_show_onscreen_controls"
             android:dialogMessage="@string/hint_show_onscreen_controls"
             android:defaultValue="false" />
+        <com.limelight.preferences.MaterialListPreference
+            android:key="list_osc_engine"
+            android:title="@string/title_osc_engine"
+            android:dialogMessage="@string/summary_osc_engine"
+            android:entries="@array/osc_engine_names"
+            android:entryValues="@array/osc_engine_values"
+            android:defaultValue="moonlight" />
+        <Preference
+            android:key="edit_osc_layout"
+            android:title="@string/title_edit_osc_layout"
+            android:summary="@string/summary_edit_osc_layout"
+            android:persistent="false" />
+        <com.limelight.preferences.MaterialSwitchPreference
+            android:key="checkbox_osc_live_blur"
+            android:title="@string/title_osc_live_blur"
+            android:dialogMessage="@string/summary_osc_live_blur"
+            android:defaultValue="false" />
         <com.limelight.preferences.MaterialSwitchPreference
             android:key="checkbox_keyboard_follows_text_fields"
             android:title="@string/title_checkbox_keyboard_follows_text_fields"

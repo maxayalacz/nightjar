@@ -269,7 +269,6 @@ public class CoverCard extends LinearLayout {
             if (shadow != null) shadow.draw(canvas, l, t + shadowY, r, b + shadowY, shadowPaint);
         }
         super.dispatchDraw(canvas);
-        drawFinish(canvas, l, t, r, b);
         if (focused) focusRing.drawRing(canvas, l, t, r, b, radius);
     }
 
