@@ -464,6 +464,14 @@ public class AddComputerManually extends NightjarActivity {
 
         this.hostText = content.findViewById(R.id.hostTextView);
         this.hostInput = content.findViewById(R.id.host_input);
+        if (!com.limelight.ui.PortalBackgroundHelper.isRobolectric() && hostInput.getParent() instanceof View) {
+            View form = (View) hostInput.getParent();
+            com.limelight.ui.OneUiThemeApplier.applyFrostedCard(
+                    form,
+                    com.limelight.ui.PortalBackgroundHelper.getShaderView(this),
+                    com.limelight.ui.FlowingAuroraView.CornerMode.ALL,
+                    22f);
+        }
         hostText.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {

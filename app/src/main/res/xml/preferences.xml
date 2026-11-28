@@ -580,6 +580,11 @@
             android:title="@string/title_checkbox_right_alt_as_meta"
             android:dialogMessage="@string/summary_checkbox_right_alt_as_meta"
             android:defaultValue="false" />
+        <com.limelight.preferences.MaterialSwitchPreference
+            android:key="checkbox_ignore_synth_events"
+            android:title="@string/title_checkbox_ignore_synth_events"
+            android:dialogMessage="@string/summary_ignore_synth_events"
+            android:defaultValue="false" />
         <com.limelight.preferences.MaterialListPreference
             android:key="list_pc_keyboard_layout"
             android:title="@string/pc_keyboard_layout_title"
@@ -607,18 +612,6 @@
             android:text="%" />
     </PreferenceCategory>
     <PreferenceCategory android:key="category_onscreen_controls" android:title="@string/category_on_screen_controls_settings">
-        <com.limelight.preferences.MaterialListPreference
-            android:key="list_osc_engine"
-            android:title="@string/title_osc_engine"
-            android:dialogMessage="@string/summary_osc_engine"
-            android:entries="@array/osc_engine_names"
-            android:entryValues="@array/osc_engine_values"
-            android:defaultValue="moonlight" />
-        <Preference
-            android:key="edit_osc_layout"
-            android:title="@string/title_edit_osc_layout"
-            android:summary="@string/summary_edit_osc_layout"
-            android:persistent="false" />
         <Preference
             android:key="edit_nightjar_osc_layout"
             android:title="@string/title_edit_nightjar_osc_layout"

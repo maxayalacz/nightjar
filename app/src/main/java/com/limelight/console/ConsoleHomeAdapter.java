@@ -552,6 +552,22 @@ final class ConsoleHomeAdapter extends RecyclerView.Adapter<ConsoleHomeAdapter.S
     public ShelfHolder onCreateViewHolder(@NonNull ViewGroup parent, int type) {
         int layout = type == HERO_PHONE ? R.layout.console_hero_phone : type == HERO_WIDE ? R.layout.console_hero_wide : R.layout.console_shelf;
         View view = LayoutInflater.from(parent.getContext()).inflate(layout, parent, false);
+        if (type == HERO_WIDE && !com.limelight.ui.PortalBackgroundHelper.isRobolectric()) {
+            com.limelight.ui.PortalShaderView psv = com.limelight.ui.PortalBackgroundHelper.getShaderView(
+                    com.limelight.ui.PortalBackgroundHelper.activityOf(parent.getContext()));
+            View heroPanel = view.findViewById(R.id.hero_panel);
+            if (heroPanel != null) {
+                com.limelight.ui.OneUiThemeApplier.applyFrostedCard(
+                        heroPanel, psv, com.limelight.ui.FlowingAuroraView.CornerMode.ALL, 20f);
+            }
+            for (int chipId : new int[] {R.id.hero_chip_state, R.id.hero_chip_store}) {
+                View chip = view.findViewById(chipId);
+                if (chip != null) {
+                    com.limelight.ui.OneUiThemeApplier.applyFrostedCard(
+                            chip, psv, com.limelight.ui.FlowingAuroraView.CornerMode.ALL, 999f);
+                }
+            }
+        }
         return new ShelfHolder(view, type);
     }
 

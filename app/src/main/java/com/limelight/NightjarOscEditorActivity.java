@@ -66,10 +66,9 @@ public class NightjarOscEditorActivity extends NightjarActivity {
     @Override
     public void onBackPressed() {
         if (modernController != null && modernController.isEditing()) {
-            modernController.finishEditing(false);
-        } else {
-            super.onBackPressed();
+            return;
         }
+        super.onBackPressed();
     }
 
     @Override

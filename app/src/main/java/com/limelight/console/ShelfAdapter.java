@@ -246,6 +246,7 @@ final class ShelfAdapter extends RecyclerView.Adapter<ShelfAdapter.CardHolder> {
         final TextView allCount;
         final TextView allName;
         final ImageView allGlyph;
+        final ImageView allChevron;
         /** The host's three dots while the D-pad has marked them; the card keeps focus. */
         private boolean moreMarked;
 
@@ -270,6 +271,7 @@ final class ShelfAdapter extends RecyclerView.Adapter<ShelfAdapter.CardHolder> {
             allCount = view.findViewById(R.id.console_all_count);
             allName = view.findViewById(R.id.console_all_name);
             allGlyph = view.findViewById(R.id.console_all_glyph);
+            allChevron = view.findViewById(R.id.console_all_chevron);
             view.setOnHoverListener((card, event) -> {
                 card.setHovered(event.getActionMasked() != android.view.MotionEvent.ACTION_HOVER_EXIT);
                 return false;
@@ -367,6 +369,8 @@ final class ShelfAdapter extends RecyclerView.Adapter<ShelfAdapter.CardHolder> {
                 badge.setCompoundDrawablesRelativeWithIntrinsicBounds(
                         state != null && card.badge == HomeModel.Badge.RUNNING ? R.drawable.ic_live_dot : 0, 0, 0, 0);
                 star.setVisibility(card.favourite ? View.VISIBLE : View.GONE);
+                star.setImageTintList(android.content.res.ColorStateList.valueOf(
+                        com.limelight.ui.AppThemePalette.getCurrent(context).accent));
             }
             if (store != null) bindStore(context, card);
             itemView.setContentDescription(describe(context, card, where, state));
@@ -438,12 +442,17 @@ final class ShelfAdapter extends RecyclerView.Adapter<ShelfAdapter.CardHolder> {
         void bindAll(String shelf, Item item) {
             HomeModel.Row row = item.all;
             Context context = env.context;
+            com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(context);
             setFrameHeight();
             allCount.setText(String.format(java.util.Locale.getDefault(), "%d", row.total));
             allName.setText(rowTitle(context, row));
             int glyph = Stores.glyph(row.store);
             if (glyph != 0) allGlyph.setImageResource(glyph);
             allGlyph.setVisibility(glyph != 0 ? View.VISIBLE : View.GONE);
+            allGlyph.setImageTintList(android.content.res.ColorStateList.valueOf(palette.getSecondaryTextColor()));
+            if (allChevron != null) {
+                allChevron.setImageTintList(android.content.res.ColorStateList.valueOf(palette.accent));
+            }
             itemView.setContentDescription(describeAll(context, row));
             itemView.setOnClickListener(v -> env.listener.onAllGames(row.filter));
             itemView.setOnLongClickListener(null);

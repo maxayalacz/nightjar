@@ -74,6 +74,8 @@ final class PadEditor extends FrameLayout {
     private final ModernController controller;
     private final PadPainter painter;
     private final PadLayout draft;
+    private final String initialSerialized;
+    private final boolean initialPerGame;
     private final boolean gameAvailable;
     private boolean perGame;
     private PadLayout.Control selected;
@@ -131,6 +133,8 @@ final class PadEditor extends FrameLayout {
         this.draft = draft;
         this.perGame = perGame && gameAvailable;
         this.gameAvailable = gameAvailable;
+        this.initialSerialized = draft.serialize();
+        this.initialPerGame = this.perGame;
         this.collapsed = !com.limelight.ui.PortalBackgroundHelper.isRobolectric();
         density = context.getResources().getDisplayMetrics().density;
         surface = new Surface(context);
@@ -154,7 +158,11 @@ final class PadEditor extends FrameLayout {
         actionsView = panel.findViewById(R.id.pad_editor_actions);
 
         gripView.setOnTouchListener((grip, event) -> dragPanel(event));
-        collapsedBar.setOnTouchListener((v, event) -> handleCollapsedTouch(event));
+        panel.findViewById(R.id.pad_editor_collapsed_expand_area)
+                .setOnTouchListener((v, event) -> handleCollapsedTouch(event));
+        panel.findViewById(R.id.pad_editor_pill_save).setOnClickListener(v -> controller.finishEditing(true));
+        panel.findViewById(R.id.pad_editor_pill_exit).setOnClickListener(v -> requestExit());
+        panel.findViewById(R.id.pad_editor_collapse).setOnClickListener(v -> collapsePanel());
         // A panel that grows or shrinks (the picked control's rows), or a surface that turns or folds, keeps a
         // placed panel whole on the surface.
         panel.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> showPlacedPanel());
@@ -194,7 +202,7 @@ final class PadEditor extends FrameLayout {
             select(null);
             changed();
         });
-        panel.findViewById(R.id.pad_editor_cancel).setOnClickListener(v -> controller.finishEditing(false));
+        panel.findViewById(R.id.pad_editor_cancel).setOnClickListener(v -> requestExit());
         panel.findViewById(R.id.pad_editor_done).setOnClickListener(v -> controller.finishEditing(true));
         MaterialSwitch gameSwitch = panel.findViewById(R.id.pad_editor_this_game);
         thisGame = gameSwitch;
@@ -220,14 +228,33 @@ final class PadEditor extends FrameLayout {
         }
     }
 
+    boolean hasUnsavedChanges() {
+        return this.perGame != initialPerGame || !initialSerialized.equals(draft.serialize());
+    }
+
+    void requestExit() {
+        if (!hasUnsavedChanges() || com.limelight.ui.PortalBackgroundHelper.isRobolectric()) {
+            controller.finishEditing(false);
+            return;
+        }
+        new NavigationDialogBuilder(getContext())
+                .startOnCancel()
+                .setTitle("Unsaved layout changes")
+                .setMessage("Save your controller layout changes before exiting?")
+                .setPositiveButton("Save", (dialog, which) -> controller.finishEditing(true))
+                .setNegativeButton("Discard", (dialog, which) -> controller.finishEditing(false))
+                .setNeutralButton("Keep Editing", null)
+                .create()
+                .show();
+    }
+
     private void applyCollapsedVisibility() {
         if (collapsed) {
             collapsedBar.setVisibility(VISIBLE);
             gripView.setVisibility(GONE);
             scrollView.setVisibility(GONE);
             actionsView.setVisibility(GONE);
-            int hp = Math.round(14 * density);
-            panel.setPaddingRelative(hp, 0, hp, 0);
+            panel.setPaddingRelative(Math.round(12 * density), 0, Math.round(8 * density), 0);
         } else {
             collapsedBar.setVisibility(GONE);
             gripView.setVisibility(VISIBLE);
@@ -238,7 +265,7 @@ final class PadEditor extends FrameLayout {
         panel.invalidate();
     }
 
-    /** Expands the floating editor window on touch; stays expanded until the editor window is closed. */
+    /** Expands the floating editor window on touch; can be collapsed back to the pill via the header button. */
     void expandPanel() {
         if (!collapsed) return;
         transition();
@@ -258,6 +285,23 @@ final class PadEditor extends FrameLayout {
             if (panelPlaced) showPlacedPanel();
             else keepPanelClear();
         });
+    }
+
+    /** Collapses the floating editor window back into the compact top pill. */
+    void collapsePanel() {
+        if (collapsed) return;
+        transition();
+        collapsed = true;
+        applyCollapsedVisibility();
+        LayoutParams params = (LayoutParams) panel.getLayoutParams();
+        params.width = LayoutParams.WRAP_CONTENT;
+        if (!panelPlaced) {
+            params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+            params.leftMargin = params.rightMargin = params.bottomMargin = 0;
+            params.topMargin = Math.round(16 * density);
+        }
+        panel.setLayoutParams(params);
+        post(this::showPlacedPanel);
     }
 
     private boolean handleCollapsedTouch(MotionEvent event) {
@@ -750,6 +794,29 @@ final class PadEditor extends FrameLayout {
         if (cChev instanceof android.widget.ImageView) {
             ((android.widget.ImageView) cChev).setImageTintList(android.content.res.ColorStateList.valueOf(secondary));
         }
+        View pillDivider = panel.findViewById(R.id.pad_editor_pill_divider);
+        if (pillDivider != null) {
+            pillDivider.setBackgroundColor((0x55 << 24) | (secondary & 0x00FFFFFF));
+        }
+        View pillSaveBtn = panel.findViewById(R.id.pad_editor_pill_save);
+        if (pillSaveBtn instanceof MaterialButton) {
+            MaterialButton mb = (MaterialButton) pillSaveBtn;
+            mb.setBackgroundTintList(android.content.res.ColorStateList.valueOf(accent));
+            mb.setTextColor(onAccent);
+            mb.setIconTint(android.content.res.ColorStateList.valueOf(onAccent));
+            mb.setRippleColor(android.content.res.ColorStateList.valueOf(0x33FFFFFF));
+        }
+        View pillExitBtn = panel.findViewById(R.id.pad_editor_pill_exit);
+        if (pillExitBtn instanceof MaterialButton) {
+            MaterialButton mb = (MaterialButton) pillExitBtn;
+            mb.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                    (0x28 << 24) | (secondary & 0x00FFFFFF)));
+            mb.setStrokeColor(android.content.res.ColorStateList.valueOf(rim));
+            mb.setStrokeWidth(Math.max(1, Math.round(density)));
+            mb.setTextColor(primary);
+            mb.setIconTint(android.content.res.ColorStateList.valueOf(secondary));
+            mb.setRippleColor(ripple);
+        }
 
         View gripBar = panel.findViewById(R.id.pad_editor_grip_bar);
         if (gripBar != null) {
@@ -779,6 +846,12 @@ final class PadEditor extends FrameLayout {
                 mb.setIconTint(android.content.res.ColorStateList.valueOf(primary));
                 mb.setRippleColor(ripple);
             }
+        }
+        View collapseBtn = panel.findViewById(R.id.pad_editor_collapse);
+        if (collapseBtn instanceof MaterialButton) {
+            MaterialButton mb = (MaterialButton) collapseBtn;
+            mb.setIconTint(android.content.res.ColorStateList.valueOf(secondary));
+            mb.setRippleColor(ripple);
         }
 
         opacity.setThumbTintList(android.content.res.ColorStateList.valueOf(highlight));

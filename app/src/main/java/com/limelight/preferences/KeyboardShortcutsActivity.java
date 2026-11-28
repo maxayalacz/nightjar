@@ -64,6 +64,15 @@ public final class KeyboardShortcutsActivity extends NightjarActivity {
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         TopAppBar.addScrollingBody(page, content);
+        if (!com.limelight.ui.PortalBackgroundHelper.isRobolectric()) {
+            int pad = Math.round(UiHelper.dpToPx(this, 16f));
+            content.setPadding(pad, pad, pad, pad);
+            com.limelight.ui.OneUiThemeApplier.applyFrostedCard(
+                    content,
+                    com.limelight.ui.PortalBackgroundHelper.getShaderView(this),
+                    com.limelight.ui.FlowingAuroraView.CornerMode.ALL,
+                    22f);
+        }
         work = new ViewModelProvider(this).get(ShortcutWork.class);
         work.busy.observe(this, ignored -> refresh());
         work.message.observe(this, ignored -> refresh());

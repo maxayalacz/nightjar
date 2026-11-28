@@ -89,8 +89,6 @@ public final class PortalQuickMenu {
         void setOscBlurAmountLive(int percent);
         void setOscBlurResolutionPercentLive(int percent);
         void setOscBlurFramerateLive(String fps);
-        String getOscEngine();
-        void setOscEngineLive(String engine);
         void setTrackpadSensitivityXLive(int percent);
         void setTrackpadSensitivityYLive(int percent);
         void setTrackpadSwapAxisLive(boolean enabled);
@@ -713,7 +711,7 @@ public final class PortalQuickMenu {
             addDrawerToggleRow(oscContent, ctx, "Vibrate Controls", cfg.vibrateOsc,
                     host::setOscVibrateLive);
 
-            addDrawerToggleRow(oscContent, ctx, "Free Analog Stick", cfg.enableNewAnalogStick,
+            addDrawerToggleRow(oscContent, ctx, "Free Analog Stick", cfg.oscFloatingSticks,
                     host::setFreeAnalogStickLive);
 
             final View[] oscBlurAmountRowRef = new View[1];
@@ -736,14 +734,6 @@ public final class PortalQuickMenu {
             setRowEnabledState(oscBlurAmountRowRef[0], cfg.oscLiveBlur);
             setRowEnabledState(oscBlurResRowRef[0], cfg.oscLiveBlur);
             setRowEnabledState(oscBlurFpsRowRef[0], cfg.oscLiveBlur);
-
-            addDrawerSegmentedRow(oscContent, ctx, "OSC Engine",
-                    new String[]{PreferenceConfiguration.OSC_ENGINE_MOONLIGHT, PreferenceConfiguration.OSC_ENGINE_NIGHTJAR},
-                    new String[]{"Moonlight", "Nightjar"},
-                    host.getOscEngine(), engine -> {
-                        host.setOscEngineLive(engine);
-                        if (refreshOscTile != null) refreshOscTile.run();
-                    });
 
             addDrawerActionButton(oscContent, ctx, "Edit OSC Layout", () ->
                     runItemAndDismiss(StreamMenu.Item.CONTROLS_LAYOUT));

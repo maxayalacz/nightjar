@@ -49,7 +49,7 @@ public final class MicButton extends View {
     private final SharedPreferences store;
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG), rim = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Drawable live, muted;
-    private final int accent, mutedFill, mutedIcon, liveIcon;
+    private final int mutedFill, mutedIcon, liveIcon;
     private final float density, slop;
     private float downX, downY, startX, startY;
     private boolean dragging, shownMuted, suppressed;
@@ -67,7 +67,6 @@ public final class MicButton extends View {
         store = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         density = context.getResources().getDisplayMetrics().density;
         slop = ViewConfiguration.get(context).getScaledTouchSlop();
-        accent = ContextCompat.getColor(context, R.color.night_primary);
         mutedFill = ContextCompat.getColor(context, R.color.night_error_container);
         mutedIcon = ContextCompat.getColor(context, R.color.night_on_error_container);
         liveIcon = 0xF2FFFFFF;

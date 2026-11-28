@@ -131,7 +131,18 @@ public class ControllerTestActivity extends NightjarActivity implements UsbDrive
         FrameLayout page = TopAppBar.setUpPage(this, R.string.controller_test_title, this::finish);
         View body = getLayoutInflater().inflate(R.layout.controller_test, page, false);
         TopAppBar.addScrollingBody(page, body);
+        if (!com.limelight.ui.PortalBackgroundHelper.isRobolectric()) {
+            int pad = Math.round(UiHelper.dpToPx(this, 16f));
+            body.setPadding(pad, pad, pad, pad);
+            com.limelight.ui.OneUiThemeApplier.applyFrostedCard(
+                    body,
+                    com.limelight.ui.PortalBackgroundHelper.getShaderView(this),
+                    com.limelight.ui.FlowingAuroraView.CornerMode.ALL,
+                    22f);
+        }
+        com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(this);
         deviceView = body.findViewById(R.id.controller_test_device);
+        deviceView.setTextColor(palette.accent);
         pressedView = body.findViewById(R.id.controller_test_pressed);
         stickValuesView = body.findViewById(R.id.controller_test_stick_values);
         axesView = body.findViewById(R.id.controller_test_axes);
@@ -152,6 +163,7 @@ public class ControllerTestActivity extends NightjarActivity implements UsbDrive
             chip.setFocusable(false);
             chip.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             chip.setTag(flag);
+            com.limelight.ui.OneUiThemeApplier.styleChip(chip, palette);
             chips.add(chip);
             buttonChips.addView(chip);
         }
@@ -438,6 +450,7 @@ public class ControllerTestActivity extends NightjarActivity implements UsbDrive
         chip.setText(label);
         chip.setCheckable(false);
         chip.setEnsureMinTouchTargetSize(true);
+        com.limelight.ui.OneUiThemeApplier.styleChip(chip, com.limelight.ui.AppThemePalette.getCurrent(this));
         chip.setOnClickListener(onClick);
         group.addView(chip);
     }
@@ -862,11 +875,12 @@ public class ControllerTestActivity extends NightjarActivity implements UsbDrive
         public SticksView(Context context, AttributeSet attrs) {
             super(context, attrs);
             density = getResources().getDisplayMetrics().density;
+            com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(context);
             outline.setStyle(Paint.Style.STROKE);
             outline.setStrokeWidth(2 * density);
-            outline.setColor(MaterialColors.getColor(context, com.google.android.material.R.attr.colorOutline, 0xFF888888));
-            fill.setColor(MaterialColors.getColor(context, androidx.appcompat.R.attr.colorPrimary, 0xFFFFB300));
-            track.setColor(MaterialColors.getColor(context, com.google.android.material.R.attr.colorSurfaceVariant, 0xFF444444));
+            outline.setColor(palette.getCardRimColor());
+            fill.setColor(palette.accent);
+            track.setColor(com.limelight.ui.AppThemePalette.withAlphaInt(palette.secondaryText, 0x44));
         }
 
         void set(float lx, float ly, float rx, float ry, float lt, float rt) {

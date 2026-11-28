@@ -22,6 +22,15 @@ public class HelpTopicsActivity extends NightjarActivity {
         FrameLayout page = TopAppBar.setUpPage(this, R.string.help, this::finish);
         View topics = getLayoutInflater().inflate(R.layout.help_topics, page, false);
         TopAppBar.addScrollingBody(page, topics);
+        if (!com.limelight.ui.PortalBackgroundHelper.isRobolectric()) {
+            int pad = Math.round(UiHelper.dpToPx(this, 16f));
+            topics.setPadding(pad, pad, pad, pad);
+            com.limelight.ui.OneUiThemeApplier.applyFrostedCard(
+                    topics,
+                    com.limelight.ui.PortalBackgroundHelper.getShaderView(this),
+                    com.limelight.ui.FlowingAuroraView.CornerMode.ALL,
+                    22f);
+        }
         // Fire TV apps may not open a browser or a web view, so the topics stand alone there.
         boolean canOpenLinks = !getPackageManager().hasSystemFeature("amazon.hardware.fire_tv");
         link(topics, R.id.help_connect_link, "quick-start.md", canOpenLinks);

@@ -57,6 +57,16 @@ public class GpuDriverSettings extends NightjarActivity {
         work.busy.observe(this, ignored -> refresh());
         work.message.observe(this, ignored -> refresh());
         refresh();
+        if (!com.limelight.ui.PortalBackgroundHelper.isRobolectric()) {
+            View driverContent = findViewById(R.id.gpu_driver_content);
+            if (driverContent != null) {
+                com.limelight.ui.OneUiThemeApplier.applyFrostedCard(
+                        driverContent,
+                        com.limelight.ui.PortalBackgroundHelper.getShaderView(this),
+                        com.limelight.ui.FlowingAuroraView.CornerMode.ALL,
+                        22f);
+            }
+        }
         UiHelper.notifyNewRootView(this);
         View root = findViewById(android.R.id.content);
         View content = findViewById(R.id.gpu_driver_root);

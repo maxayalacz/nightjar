@@ -43,6 +43,12 @@ public final class PcKeyboardOverlay extends LinearLayout {
         GlassPanelDrawable background = GlassPanelDrawable.hud(context, new float[] {corner, corner, corner, corner, 0, 0, 0, 0});
         background.setFillOpacity(opacityPercent / 100f);
         setBackground(background);
+        if (!PortalBackgroundHelper.isRobolectric()) {
+            android.app.Activity hostActivity = PortalBackgroundHelper.activityOf(context);
+            if (hostActivity != null) {
+                com.limelight.utils.UiHelper.attachPanelBackdropBlur(hostActivity, this, corner);
+            }
+        }
         // Keys must not take focus from the stream or draw the system focus ring around the panel.
         setFocusable(false);
         setClickable(true);
@@ -59,6 +65,7 @@ public final class PcKeyboardOverlay extends LinearLayout {
         keys = new PcKeyboardView(context, controller);
         view[0] = keys;
 
+        AppThemePalette palette = AppThemePalette.getCurrent(context);
         LinearLayout header = new LinearLayout(context);
         header.setOrientation(HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -67,14 +74,14 @@ public final class PcKeyboardOverlay extends LinearLayout {
 
         TextView title = new TextView(context);
         title.setText(R.string.pc_keyboard_title);
-        title.setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.nj_color_label));
+        title.setTextColor(palette.getPrimaryTextColor());
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setTextSize(13);
         header.addView(title, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
 
         // Touch users switch layouts here for this stream; the setting picks the starting one.
         layoutName = new TextView(context);
-        layoutName.setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.nj_color_label_secondary));
+        layoutName.setTextColor(palette.getSecondaryTextColor());
         layoutName.setTextSize(13);
         layoutName.setPadding(pad * 2, pad, pad * 2, pad);
         layoutName.setOnClickListener(v -> cycleLayout());

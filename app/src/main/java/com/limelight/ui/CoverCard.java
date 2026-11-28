@@ -2,11 +2,8 @@ package com.limelight.ui;
 
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.LinearGradient;
 import android.graphics.Outline;
 import android.graphics.Paint;
-import android.graphics.RectF;
-import android.graphics.Shader;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.ViewOutlineProvider;
@@ -22,8 +19,8 @@ import java.util.WeakHashMap;
 import java.util.function.BooleanSupplier;
 
 /**
- * A game's cover: art clipped to a round rectangle with a soft shadow under it and a lit rim and sheen on it, all drawn
- * by this one view. Focus lifts it with a spring and rings it; a press pushes it in. While one cover of a {@link Group}
+ * A game's cover: art clipped to a round rectangle with a soft shadow under it, drawn by this one view.
+ * Focus lifts it with a spring and rings it; a press pushes it in. While one cover of a {@link Group}
  * has focus the others step back. The art's slot keeps its size whatever is loading, so nothing jumps.
  */
 public class CoverCard extends LinearLayout {
@@ -58,8 +55,6 @@ public class CoverCard extends LinearLayout {
     private float restScale = 1f;
     private float stepBack;
     private final float radius;
-    private final Paint rim = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint sheen = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint shadowPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
     private float shadowBlur;
     private float shadowY;
@@ -68,15 +63,12 @@ public class CoverCard extends LinearLayout {
     private float focusScale;
     private final float pressScale;
     private final FocusRing focusRing;
-    private final RectF rect = new RectF();
     private final Runnable invalidator = this::invalidate;
     private Group group;
     private final Runnable releaser = () -> {
         if (group != null) group.release(this);
     };
     private BooleanSupplier instant = () -> false;
-    private int shaderW;
-    private int shaderH;
     private final boolean highContrast;
 
     public CoverCard(Context context) {
@@ -93,8 +85,6 @@ public class CoverCard extends LinearLayout {
         highContrast = AppTheme.isHighContrast(context);
         boolean television = GlassForm.of(context) == GlassForm.TELEVISION;
         radius = res.getDimension(R.dimen.glass_cover_radius);
-        rim.setStyle(Paint.Style.STROKE);
-        rim.setStrokeWidth(highContrast ? res.getDimension(R.dimen.nj_glass_chrome_solid_rim_width) : Math.max(1f, res.getDisplayMetrics().density * 0.75f));
         shadowPaint.setColor(ResourcesCompat.getColor(res, R.color.nj_cover_shadow, null));
         shadowBlur = highContrast ? 0f : res.getDimension(R.dimen.nj_cover_shadow_blur);
         shadowY = res.getDimension(R.dimen.nj_cover_shadow_y);
@@ -270,36 +260,5 @@ public class CoverCard extends LinearLayout {
         }
         super.dispatchDraw(canvas);
         if (focused) focusRing.drawRing(canvas, l, t, r, b, radius);
-    }
-
-    /** The sheen across the top and the rim, lit from above. */
-    private void drawFinish(Canvas canvas, float l, float t, float r, float b) {
-        int w = (int) (r - l);
-        int h = (int) (b - t);
-        if (w != shaderW || h != shaderH) {
-            shaderW = w;
-            shaderH = h;
-            android.content.res.Resources res = getResources();
-            int top = highContrast ? ResourcesCompat.getColor(res, R.color.nj_hc_color_rim, null)
-                    : ResourcesCompat.getColor(res, R.color.nj_cover_rim_top, null);
-            int bottom = highContrast ? top : ResourcesCompat.getColor(res, R.color.nj_cover_rim_bottom, null);
-            rim.setShader(new LinearGradient(0, 0, w * 0.2f, h, new int[] {top, bottom, bottom}, new float[] {0f, 0.3f, 1f}, Shader.TileMode.CLAMP));
-            int sheenTop = ResourcesCompat.getColor(res, R.color.nj_cover_sheen_top, null);
-            sheen.setShader(new LinearGradient(0, 0, w * 0.26f, h * 0.26f, sheenTop, sheenTop & 0xFFFFFF, Shader.TileMode.CLAMP));
-        }
-        int save = canvas.save();
-        canvas.translate(l, t);
-        float dim = frame.getAlpha();
-        int alpha = Math.round(255 * dim);
-        rim.setAlpha(isHovered() ? 255 : alpha);
-        rect.set(0, 0, w, h);
-        if (!highContrast) {
-            sheen.setAlpha(alpha);
-            canvas.drawRoundRect(rect, radius, radius, sheen);
-        }
-        float inset = rim.getStrokeWidth() / 2f;
-        rect.inset(inset, inset);
-        canvas.drawRoundRect(rect, radius - inset, radius - inset, rim);
-        canvas.restoreToCount(save);
     }
 }

@@ -427,7 +427,15 @@ final class HomeChrome {
         } else {
             params.bottomMargin = bottom + res.getDimensionPixelSize(R.dimen.space_s) + res.getDimensionPixelSize(R.dimen.nj_size_tab_bar_height)
                     + res.getDimensionPixelSize(R.dimen.space_s);
-            hints.setBackgroundResource(R.drawable.glass_chip_over_art);
+            if (!com.limelight.ui.PortalBackgroundHelper.isRobolectric()) {
+                com.limelight.ui.OneUiThemeApplier.applyFrostedCard(
+                        hints,
+                        com.limelight.ui.PortalBackgroundHelper.getShaderView(activity),
+                        com.limelight.ui.FlowingAuroraView.CornerMode.ALL,
+                        999f);
+            } else {
+                hints.setBackgroundResource(R.drawable.glass_chip_over_art);
+            }
         }
         hints.setLayoutParams(params);
     }

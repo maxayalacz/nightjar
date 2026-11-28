@@ -4,16 +4,12 @@ import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.ColorMatrixColorFilter;
-import android.graphics.LinearGradient;
 import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RecordingCanvas;
 import android.graphics.Region;
-import android.graphics.RenderEffect;
 import android.graphics.RenderNode;
-import android.graphics.RuntimeShader;
-import android.graphics.Shader;
 import android.os.Build;
 import android.util.AttributeSet;
 import android.view.ViewParent;
@@ -25,29 +21,12 @@ import com.limelight.R;
 
 /**
  * A piece of glass: back to front, shadow, the blurred backdrop or the baked ambient or an opaque fill, depending on
- * the tier, the fill, the lens band, the sheen and the rim. Its children sit on top. Must be a descendant of a
+ * the tier, the fill, and the rim. Its children sit on top. Must be a descendant of a
  * {@link GlassHost}, but not within the host's first child; without a host it draws its fill.
  */
 public class GlassSurface extends FrameLayout {
     /** The blur works on the content at this fraction of its size. */
     static final int BLUR_SCALE = 4;
-
-    /** The band only brightens and shifts UVs in the outer ring; p is in pixels of the surface. */
-    private static final String LENS_SHADER = "uniform shader content;\n"
-            + "uniform float2 size;\n"
-            + "uniform float radius;\n"
-            + "uniform float band;\n"
-            + "half4 main(float2 p) {\n"
-            + "  float2 c = size * 0.5;\n"
-            + "  float2 q = abs(p - c) - (c - radius);\n"
-            + "  float d = length(max(q, float2(0.0))) + min(max(q.x, q.y), 0.0) - radius;\n"
-            + "  float t = clamp(1.0 + d / band, 0.0, 1.0);\n"
-            + "  if (t <= 0.0) return half4(0.0);\n"
-            + "  float2 outward = q.x > 0.0 && q.y > 0.0 ? normalize(q) : (q.x > q.y ? float2(1.0, 0.0) : float2(0.0, 1.0));\n"
-            + "  outward *= sign(p - c);\n"
-            + "  float2 uv = p - outward * t * t * band * 1.2;\n"
-            + "  return content.eval(uv) * half(t);\n"
-            + "}\n";
 
     private final String material;
     private GlassHost host;
@@ -61,7 +40,6 @@ public class GlassSurface extends FrameLayout {
     private int atY;
 
     private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint sheenPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint rimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint hairlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint shadowPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
@@ -70,7 +48,6 @@ public class GlassSurface extends FrameLayout {
     private final Path rimShape = new Path();
 
     private Object glassNode;
-    private Object lensNode;
     private boolean nodesStale = true;
 
     public GlassSurface(Context context) {
@@ -125,7 +102,6 @@ public class GlassSurface extends FrameLayout {
         if (host != null) host.unregister(this);
         host = null;
         glassNode = null;
-        lensNode = null;
     }
 
     void onTierChanged() {
@@ -181,21 +157,6 @@ public class GlassSurface extends FrameLayout {
         float inset = spec.rimWidth / 2f;
         rimShape.reset();
         rimShape.addRoundRect(inset, inset, w - inset, h - inset, Math.max(0f, r - inset), Math.max(0f, r - inset), Path.Direction.CW);
-        if (spec.sheenEnd > 0f) {
-            sheenPaint.setShader(new LinearGradient(0, 0, 0, h, new int[] {spec.sheenTop, spec.sheenTop & 0xFFFFFF, spec.sheenTop & 0xFFFFFF},
-                    new float[] {0f, spec.sheenEnd, 1f}, Shader.TileMode.CLAMP));
-        } else {
-            sheenPaint.setShader(null);
-        }
-        // The rim is lit from above and slightly from the left, as CSS 168deg: mostly vertical.
-        double angle = Math.toRadians(168);
-        float dx = (float) Math.sin(angle);
-        float dy = (float) -Math.cos(angle);
-        float length = Math.abs(w * dx) + Math.abs(h * dy);
-        float cx = w / 2f;
-        float cy = h / 2f;
-        rimPaint.setShader(new LinearGradient(cx - dx * length / 2f, cy - dy * length / 2f, cx + dx * length / 2f, cy + dy * length / 2f,
-                new int[] {spec.rimTop, spec.rimMid, spec.rimMid, spec.rimBottom}, new float[] {0f, 0.34f, 0.62f, 1f}, Shader.TileMode.CLAMP));
         nodesStale = true;
         invalidate();
     }
@@ -369,36 +330,5 @@ public class GlassSurface extends FrameLayout {
         outline.setRoundRect(0, 0, getWidth(), getHeight(), cornerRadius());
         node.setOutline(outline);
         node.setClipToOutline(true);
-    }
-
-    /** The outer band: its own view of the content, a touch blurred and brightened, with shifted UVs. */
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-    private void recordLens() {
-        RenderNode content = host.contentNode();
-        if (content == null) return;
-        RenderNode node = lensNode == null ? new RenderNode("glass-lens") : (RenderNode) lensNode;
-        try {
-            RuntimeShader shader = new RuntimeShader(LENS_SHADER);
-            shader.setFloatUniform("size", getWidth(), getHeight());
-            shader.setFloatUniform("radius", cornerRadius());
-            shader.setFloatUniform("band", spec.lensWidth);
-            float sigma = spec.lensBlur;
-            node.setRenderEffect(RenderEffect.createChainEffect(
-                    RenderEffect.createRuntimeShaderEffect(shader, "content"),
-                    RenderEffect.createChainEffect(
-                            RenderEffect.createColorFilterEffect(new ColorMatrixColorFilter(
-                                    GlassHost.glassMatrix(spec.lensSaturate, spec.lensBrightness * spec.brightness))),
-                            RenderEffect.createBlurEffect(GlassHost.radiusForSigma(sigma), GlassHost.radiusForSigma(sigma), Shader.TileMode.CLAMP))));
-        } catch (RuntimeException failed) {
-            // A driver that cannot run the band keeps the blur: that is the live tier's look.
-            lensNode = null;
-            return;
-        }
-        lensNode = node;
-        clip(node);
-        RecordingCanvas recording = node.beginRecording(getWidth(), getHeight());
-        recording.translate(-atX, -atY);
-        recording.drawRenderNode(content);
-        node.endRecording();
     }
 }

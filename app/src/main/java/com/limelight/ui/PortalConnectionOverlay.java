@@ -95,6 +95,7 @@ public class PortalConnectionOverlay extends FrameLayout {
     private boolean active = false;
     private boolean disconnecting = false;
     private boolean canceling = false;
+    private boolean reconnecting = false;
     private boolean phase0AnimatorStarted = false;
     private boolean phase0Completed = false;
     private boolean sonarHoldCompleted = false;
@@ -255,6 +256,15 @@ public class PortalConnectionOverlay extends FrameLayout {
     }
 
     /**
+     * Captures the current live GL frame for seamless Activity handoff across auto-reconnect retries.
+     */
+    public void captureHandoffFrame() {
+        if (shaderView != null && active && getVisibility() == VISIBLE) {
+            PortalShaderView.captureHandoffFrame(shaderView);
+        }
+    }
+
+    /**
      * Launch Sequence: holds the synced starfield handoff until the first GL frame renders, then
      * runs Phase 0 (Iris Close-In) followed automatically by Phase 1 (Connecting sonar ripples).
      */
@@ -270,6 +280,7 @@ public class PortalConnectionOverlay extends FrameLayout {
         this.active = true;
         this.disconnecting = false;
         this.canceling = false;
+        this.reconnecting = false;
         this.phase0AnimatorStarted = false;
         this.phase0Completed = false;
         this.sonarHoldCompleted = false;
@@ -689,6 +700,320 @@ public class PortalConnectionOverlay extends FrameLayout {
     }
 
     /**
+     * Auto-reconnect sequence when a live stream drops:
+     *  - If already active in sonar (or transitioning into sonar), updates stage subtitle and cancel callback in-place.
+     *  - Otherwise runs Disconnect Step 1 (expand: 1 -> 0 over live stream) -> Step 2 (preview/charge/ready: 1 -> 0)
+     *    -> switches to Sonar (isDisconnecting = false, uniforms = (0, 0, 0, 0, 1)) and fades in HUD.
+     */
+    public void startReconnecting(
+            @Nullable final String hostName,
+            @Nullable final String stage,
+            @Nullable final Runnable onCancel) {
+        runOnMain(() -> {
+            if (active && getVisibility() == VISIBLE && !disconnecting && !canceling && !phase2Started) {
+                this.onCancelAction = onCancel;
+                if (stageSubtitleView != null) {
+                    stageSubtitleView.setText(stage != null ? stage : "");
+                }
+                return;
+            }
+            cancelAnimatorsAndCallbacks();
+            shaderView.stopRendering();
+            loadPreferences();
+
+            this.active = true;
+            this.disconnecting = false;
+            this.canceling = false;
+            this.reconnecting = true;
+            this.phase0AnimatorStarted = false;
+            this.phase0Completed = false;
+            this.sonarHoldCompleted = false;
+            this.connectionStartedPending = false;
+            this.phase2Started = false;
+            this.phase3ChargeStarted = false;
+            this.phase3ChargeCompleted = false;
+            this.firstFrameReceived = false;
+            this.phase3Started = false;
+            this.disconnectStep1Started = false;
+            this.onCancelAction = onCancel;
+            this.onRevealCompleteAction = null;
+
+            // Start transparent over the live stream frame, matching Disconnect Step 1
+            shaderView.setIsDisconnecting(true);
+            shaderView.setUniforms(1f, 1f, 1f, 1f, 1f);
+
+            handoffBackdropView.setVisibility(GONE);
+            String titleText = (hostName != null && !hostName.trim().isEmpty())
+                    ? "Reconnecting to \"" + hostName.trim() + "\""
+                    : getContext().getString(R.string.stream_reconnecting);
+            statusTitleView.setText(titleText);
+            stageSubtitleView.setText(stage != null ? stage : "");
+
+            topHudContainer.setVisibility(VISIBLE);
+            topHudContainer.setAlpha(0f);
+            topHudContainer.setTranslationY(dp(8));
+            statusTitleView.setAlpha(1f);
+            stageSubtitleView.setAlpha(1f);
+            cancelButton.setVisibility(VISIBLE);
+            cancelButton.setAlpha(0f);
+            cancelButton.setTranslationY(dp(8));
+
+            setClickable(true);
+            setFocusable(true);
+            setVisibility(VISIBLE);
+            bringToFront();
+
+            final Runnable triggerStep1 = this::beginReconnectStep1;
+            pendingFirstFrameFallback = triggerStep1;
+            shaderView.setFirstFrameListener(triggerStep1);
+            mainHandler.postDelayed(triggerStep1, GL_FIRST_FRAME_TIMEOUT_MS);
+
+            shaderView.startRendering();
+        });
+    }
+
+    private void beginReconnectStep1() {
+        if (disconnectStep1Started || !active || !reconnecting || disconnecting || canceling) {
+            return;
+        }
+        disconnectStep1Started = true;
+        clearPendingFirstFrameFallback();
+        shaderView.setFirstFrameListener(null);
+
+        // Step 1: Iris close over live stream (expand: 1 -> 0)
+        activeAnimator = ValueAnimator.ofFloat(1f, 0f);
+        activeAnimator.setDuration(disconnectStep1IrisCloseMs);
+        activeAnimator.setInterpolator(new LinearInterpolator());
+        activeAnimator.addUpdateListener(anim -> shaderView.setExpandProgress((float) anim.getAnimatedValue()));
+        activeAnimator.addListener(new AnimatorListenerAdapter() {
+            private boolean canceled = false;
+
+            @Override
+            public void onAnimationCancel(Animator animation) {
+                canceled = true;
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (canceled || !active || !reconnecting || disconnecting || canceling) {
+                    return;
+                }
+                shaderView.setExpandProgress(0f);
+                runReconnectStep2();
+            }
+        });
+        activeAnimator.start();
+    }
+
+    private void runReconnectStep2() {
+        // Step 2: Fade live stream preview/charge/ready back to starfield (1 -> 0)
+        activeAnimator = ValueAnimator.ofFloat(1f, 0f);
+        activeAnimator.setDuration(disconnectStep2FadeStarfieldMs);
+        activeAnimator.setInterpolator(new LinearInterpolator());
+        activeAnimator.addUpdateListener(a -> {
+            float v = (float) a.getAnimatedValue();
+            shaderView.setPreviewMix(v);
+            shaderView.setChargeMix(v);
+            shaderView.setReadyMix(v);
+        });
+        activeAnimator.addListener(new AnimatorListenerAdapter() {
+            private boolean canceled = false;
+
+            @Override
+            public void onAnimationCancel(Animator animation) {
+                canceled = true;
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (canceled || !active || !reconnecting || disconnecting || canceling) {
+                    return;
+                }
+                reconnecting = false;
+                shaderView.setIsDisconnecting(false);
+                shaderView.setUniforms(0f, 0f, 0f, 0f, 1f);
+                phase0AnimatorStarted = true;
+                phase0Completed = true;
+                sonarHoldCompleted = true;
+
+                PathInterpolator hudEase = new PathInterpolator(0.22f, 1f, 0.36f, 1f);
+                topHudContainer.animate()
+                        .alpha(1f)
+                        .translationY(0f)
+                        .setDuration(260L)
+                        .setInterpolator(hudEase)
+                        .start();
+                cancelButton.animate()
+                        .alpha(1f)
+                        .translationY(0f)
+                        .setDuration(260L)
+                        .setInterpolator(hudEase)
+                        .start();
+
+                if (connectionStartedPending && !phase2Started) {
+                    startPhase2();
+                }
+            }
+        });
+        activeAnimator.start();
+    }
+
+    /**
+     * Seamless retry handoff: initializes directly into Sonar (ready=0, charge=0, preview=0, expand=0, pulseMorph=1)
+     * with the captured PortalShaderView handoff frame until the first GL frame renders.
+     */
+    public void resumeInSonar(
+            @Nullable final String hostName,
+            @Nullable final String stage,
+            @Nullable final Runnable onCancel) {
+        runOnMain(() -> {
+            cancelAnimatorsAndCallbacks();
+            shaderView.stopRendering();
+            loadPreferences();
+
+            this.active = true;
+            this.disconnecting = false;
+            this.canceling = false;
+            this.reconnecting = false;
+            this.phase0AnimatorStarted = true;
+            this.phase0Completed = true;
+            this.sonarHoldCompleted = true;
+            this.connectionStartedPending = false;
+            this.phase2Started = false;
+            this.phase3ChargeStarted = false;
+            this.phase3ChargeCompleted = false;
+            this.firstFrameReceived = false;
+            this.phase3Started = false;
+            this.disconnectStep1Started = false;
+            this.onCancelAction = onCancel;
+            this.onRevealCompleteAction = null;
+
+            shaderView.setIsDisconnecting(false);
+            shaderView.setUniforms(0f, 0f, 0f, 0f, 1f);
+
+            boolean landscape = getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+            Bitmap snap = PortalShaderView.getHandoffBitmap(landscape);
+            if (snap != null) {
+                handoffBackdropView.setImageBitmap(snap);
+            } else {
+                handoffBackdropView.setImageDrawable(null);
+            }
+            handoffBackdropView.setVisibility(VISIBLE);
+
+            String titleText = (hostName != null && !hostName.trim().isEmpty())
+                    ? "Reconnecting to \"" + hostName.trim() + "\""
+                    : getContext().getString(R.string.stream_reconnecting);
+            statusTitleView.setText(titleText);
+            stageSubtitleView.setText(stage != null ? stage : "");
+
+            topHudContainer.setVisibility(VISIBLE);
+            topHudContainer.setAlpha(1f);
+            topHudContainer.setTranslationY(0f);
+            statusTitleView.setAlpha(1f);
+            stageSubtitleView.setAlpha(1f);
+            cancelButton.setVisibility(VISIBLE);
+            cancelButton.setAlpha(1f);
+            cancelButton.setTranslationY(0f);
+
+            setClickable(true);
+            setFocusable(true);
+            setVisibility(VISIBLE);
+            bringToFront();
+
+            final Runnable hideHandoff = () -> {
+                clearPendingFirstFrameFallback();
+                shaderView.setFirstFrameListener(null);
+                if (handoffBackdropView != null) {
+                    handoffBackdropView.setVisibility(GONE);
+                }
+            };
+            pendingFirstFrameFallback = hideHandoff;
+            shaderView.setFirstFrameListener(hideHandoff);
+            mainHandler.postDelayed(hideHandoff, GL_FIRST_FRAME_TIMEOUT_MS);
+
+            shaderView.startRendering();
+        });
+    }
+
+    /**
+     * Smoothly spirals open from the current Sonar state back to the full-screen starfield
+     * (leaving shaderView visible behind any failure/reconnect dialog) and invokes {@code onComplete}.
+     */
+    public void reopenFromSonar(@Nullable final Runnable onComplete) {
+        if (PortalBackgroundHelper.isRobolectric() || !active || getVisibility() != VISIBLE) {
+            if (onComplete != null) {
+                onComplete.run();
+            }
+            return;
+        }
+        runOnMain(() -> {
+            if (PortalBackgroundHelper.isRobolectric() || !active || getVisibility() != VISIBLE) {
+                if (onComplete != null) {
+                    onComplete.run();
+                }
+                return;
+            }
+            disconnecting = false;
+            canceling = true;
+            reconnecting = false;
+            cancelAnimatorsAndCallbacks();
+            if (handoffBackdropView != null) {
+                handoffBackdropView.setVisibility(GONE);
+            }
+
+            topHudContainer.animate().alpha(0f).setDuration(180L).start();
+            cancelButton.animate().alpha(0f).setDuration(180L)
+                    .withEndAction(() -> cancelButton.setVisibility(GONE)).start();
+            setClickable(false);
+            setFocusable(false);
+
+            shaderView.setIsDisconnecting(true);
+
+            final float startPreview = shaderView.getPreviewMix();
+            final float startCharge = shaderView.getChargeMix();
+            final float startReady = shaderView.getReadyMix();
+            final float startExpand = shaderView.getExpandProgress();
+            final float startPulseMorph = shaderView.getPulseMorph();
+
+            activeAnimator = ValueAnimator.ofFloat(0f, 1f);
+            activeAnimator.setDuration(disconnectStep3IrisOpenMs);
+            activeAnimator.setInterpolator(new LinearInterpolator());
+            activeAnimator.addUpdateListener(anim -> {
+                float t = (float) anim.getAnimatedValue();
+                shaderView.setPreviewMix(startPreview * (1f - t));
+                shaderView.setChargeMix(startCharge * (1f - t));
+                shaderView.setReadyMix(startReady * (1f - t));
+                shaderView.setExpandProgress(startExpand + (1f - startExpand) * t);
+                shaderView.setPulseMorph(startPulseMorph * (1f - t));
+            });
+            activeAnimator.addListener(new AnimatorListenerAdapter() {
+                private boolean innerCanceled = false;
+
+                @Override
+                public void onAnimationCancel(Animator animation) {
+                    innerCanceled = true;
+                }
+
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    if (innerCanceled) {
+                        return;
+                    }
+                    shaderView.setIsDisconnecting(false);
+                    shaderView.setUniforms(0f, 0f, 0f, 1f, 0f);
+                    PortalShaderView.captureHandoffFrame(shaderView);
+                    canceling = false;
+                    active = false;
+                    if (onComplete != null) {
+                        onComplete.run();
+                    }
+                }
+            });
+            activeAnimator.start();
+        });
+    }
+
+    /**
      * Bidirectional Disconnect / Close Sequence (Live Stream -> App Menu):
      *  - Wait for first transparent GL frame so Step 1 starts smoothly from expand = 1.0
      *  - Step 1: Iris close over live stream (u_expandProgress 1 -> 0, preview & charge & ready = 1, u_isDisconnecting = 1)
@@ -704,7 +1029,7 @@ public class PortalConnectionOverlay extends FrameLayout {
     public void startDisconnecting(
             @Nullable final Runnable onBeginTeardown,
             @Nullable final Runnable onComplete) {
-        mainHandler.post(() -> {
+        runOnMain(() -> {
             if (disconnecting) {
                 return;
             }
@@ -715,6 +1040,7 @@ public class PortalConnectionOverlay extends FrameLayout {
             this.active = true;
             this.disconnecting = true;
             this.canceling = false;
+            this.reconnecting = false;
             this.disconnectStep1Started = false;
             shaderView.setIsDisconnecting(true);
             shaderView.setUniforms(1f, 1f, 1f, 1f, 1f);
@@ -843,6 +1169,14 @@ public class PortalConnectionOverlay extends FrameLayout {
         activeAnimator.start();
     }
 
+    private void runOnMain(@NonNull Runnable action) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            action.run();
+        } else {
+            mainHandler.post(action);
+        }
+    }
+
     /**
      * Stops the GL render loop, releases EGL/GL resources cleanly, and hides the overlay with
      * zero overdraw during gameplay.
@@ -861,6 +1195,7 @@ public class PortalConnectionOverlay extends FrameLayout {
         active = false;
         disconnecting = false;
         canceling = false;
+        reconnecting = false;
         phase0AnimatorStarted = false;
         phase0Completed = false;
         sonarHoldCompleted = false;

@@ -39,8 +39,6 @@ public final class DesktopTrackpad extends View {
     private boolean active, ignored, moved, wasTwoFinger, haptics = true;
     private float lastX, lastY, distance;
     private long downTime;
-    private android.graphics.Shader rim;
-    private int rimHeight;
 
     public DesktopTrackpad(Context context, DesktopControlsConfig configuration, Sink sink) {
         super(context);
@@ -86,31 +84,20 @@ public final class DesktopTrackpad extends View {
 
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        // A well in the stream's glass: the group tint and its lit rim; touched, the moon's ring.
+        AppThemePalette palette = AppThemePalette.getCurrent(getContext());
         boolean highContrast = AppTheme.isHighContrast(getContext());
         float corner = 14 * density;
         paint.setStyle(Paint.Style.FILL);
         paint.setShader(null);
         paint.setColor(highContrast ? MaterialColors.getColor(StreamGlass.themed(getContext()), R.attr.glassControlFill, 0)
-                : androidx.core.content.ContextCompat.getColor(getContext(), R.color.nj_tint_group_fill));
+                : palette.getFrostedCardTint(0x52121826));
         canvas.drawRoundRect(bounds, corner, corner, paint);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(active ? 2 * density : density);
-        if (active || highContrast) {
-            paint.setColor(active ? androidx.core.content.ContextCompat.getColor(getContext(), R.color.nj_color_moon) : MaterialColors.getColor(StreamGlass.themed(getContext()), R.attr.glassControlRim, 0));
-        } else {
-            if (rim == null || rimHeight != getHeight()) {
-                rimHeight = getHeight();
-                rim = new android.graphics.LinearGradient(0, 0, 0, rimHeight, new int[] {androidx.core.content.ContextCompat.getColor(getContext(), R.color.nj_tint_group_rim_top),
-                        androidx.core.content.ContextCompat.getColor(getContext(), R.color.nj_tint_group_rim_mid), androidx.core.content.ContextCompat.getColor(getContext(), R.color.nj_tint_group_rim_bottom)},
-                        new float[] {0f, 0.45f, 1f}, android.graphics.Shader.TileMode.CLAMP);
-            }
-            paint.setShader(rim);
-        }
+        paint.setColor(active ? palette.accent : highContrast ? palette.getPrimaryTextColor() : palette.getCardRimColor());
         canvas.drawRoundRect(bounds, corner, corner, paint);
-        paint.setShader(null);
         paint.setStyle(Paint.Style.FILL);
-        hintPaint.setColor(androidx.core.content.ContextCompat.getColor(getContext(), R.color.nj_color_label_secondary));
+        hintPaint.setColor(palette.getSecondaryTextColor());
         // The well lets the game through: the hint carries a shadow, as the statistics do.
         hintPaint.setShadowLayer(2 * density, 0, density / 2, 0xCC000000);
         float lineHeight = hintPaint.getFontSpacing();

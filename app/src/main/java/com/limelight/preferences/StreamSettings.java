@@ -614,9 +614,8 @@ public class StreamSettings extends NightjarActivity {
             if (chip instanceof TextView) {
                 TextView tv = (TextView) chip;
                 if (selected) {
-                    android.graphics.drawable.GradientDrawable selBg = new android.graphics.drawable.GradientDrawable(
-                            android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
-                            new int[] { palette.highlight, palette.accent });
+                    android.graphics.drawable.GradientDrawable selBg = new android.graphics.drawable.GradientDrawable();
+                    selBg.setColor(palette.accent);
                     selBg.setCornerRadius(com.limelight.utils.UiHelper.dpToPx(this, 20f));
                     tv.setBackground(selBg);
                     tv.setTextColor(onAccent);
@@ -1115,6 +1114,21 @@ public class StreamSettings extends NightjarActivity {
         updateHeader();
 
         UiHelper.notifyNewRootView(this);
+        if (savedInstanceState != null) {
+            ensurePanesLoaded();
+        }
+    }
+
+    private void ensurePanesLoaded() {
+        // A recreated activity on API 24+ preserves its attached Window, so onAttachedToWindow() may not fire again
+        // after dropMisplacedPanes() removes fragments from the previous layout.
+        if (getFragmentManager().findFragmentById(R.id.stream_settings) == null
+                || (twoPane && getFragmentManager().findFragmentById(R.id.settings_sections) == null)) {
+            reloadSettings();
+        } else {
+            Display.Mode mode = getWindowManager().getDefaultDisplay().getMode();
+            previousDisplayPixelCount = mode.getPhysicalWidth() * mode.getPhysicalHeight();
+        }
     }
 
     /** A recreated activity gets back the fragments of the layout it had; the other layout has no place for them. */
@@ -1167,6 +1181,8 @@ public class StreamSettings extends NightjarActivity {
         if (renderPending) {
             renderPending = false;
             reloadSettings();
+        } else {
+            ensurePanesLoaded();
         }
     }
 
@@ -1232,15 +1248,7 @@ public class StreamSettings extends NightjarActivity {
     @Override
     public void onAttachedToWindow() {
         super.onAttachedToWindow();
-
-        // A recreated two-pane screen gets its section back but not the list of sections, when it came from one pane.
-        if (getFragmentManager().findFragmentById(R.id.stream_settings) == null
-                || (twoPane && getFragmentManager().findFragmentById(R.id.settings_sections) == null)) {
-            reloadSettings();
-        } else {
-            Display.Mode mode = getWindowManager().getDefaultDisplay().getMode();
-            previousDisplayPixelCount = mode.getPhysicalWidth() * mode.getPhysicalHeight();
-        }
+        ensurePanesLoaded();
     }
 
     @Override
@@ -3161,14 +3169,6 @@ public class StreamSettings extends NightjarActivity {
             if (themeStudioPref != null) {
                 themeStudioPref.setOnPreferenceClickListener(preference -> {
                     Intent intent = new Intent(getActivity(), com.limelight.ui.ThemeStudioActivity.class);
-                    startActivity(intent);
-                    return true;
-                });
-            }
-            Preference editOscPref = findPreference("edit_osc_layout");
-            if (editOscPref != null) {
-                editOscPref.setOnPreferenceClickListener(preference -> {
-                    Intent intent = new Intent(getActivity(), com.limelight.OscLayoutEditorActivity.class);
                     startActivity(intent);
                     return true;
                 });

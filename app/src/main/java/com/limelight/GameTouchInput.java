@@ -447,11 +447,6 @@ final class GameTouchInput {
     }
 
     void showControllerLayoutDialog() {
-        if (game.prefConfig == null
-                || !com.limelight.preferences.PreferenceConfiguration.OSC_ENGINE_NIGHTJAR.equals(game.prefConfig.oscEngine)) {
-            game.startInlineOscLayoutEdit();
-            return;
-        }
         // A connected gamepad may have kept the controls off the screen; their layout is still editable.
         game.ensureOnscreenControllers();
         // The controller edits in place: drag, pinch and the panel.
@@ -900,6 +895,10 @@ final class GameTouchInput {
     private boolean handleMotionEventUntransformed(View view, MotionEvent event) {
         // Pass through mouse/touch/joystick input if we're not grabbing
         if (!game.grabbedInput) {
+            return false;
+        }
+
+        if (game.prefConfig.ignoreSynthEvents && event.getDeviceId() <= 0) {
             return false;
         }
 

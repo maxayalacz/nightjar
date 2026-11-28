@@ -131,9 +131,16 @@ public class DesktopControlsPanel extends LinearLayout {
         if (!bankEnabled(bank)) bank = "typing";
         // The stream's glass for what stays up while the game plays: no blur, the keys carry their own fill. The opacity
         // setting is the panel fill's alpha, as before; the keys stay opaque.
-        GlassPanelDrawable background = GlassPanelDrawable.hud(getContext(), new float[] {dp(18), dp(18), dp(18), dp(18), 0, 0, 0, 0});
+        float corner = dp(18);
+        GlassPanelDrawable background = GlassPanelDrawable.hud(getContext(), new float[] {corner, corner, corner, corner, 0, 0, 0, 0});
         background.setFillOpacity(config.opacityPercent / 100f);
         setBackground(background);
+        if (!PortalBackgroundHelper.isRobolectric()) {
+            android.app.Activity hostActivity = PortalBackgroundHelper.activityOf(getContext());
+            if (hostActivity != null) {
+                com.limelight.utils.UiHelper.attachPanelBackdropBlur(hostActivity, this, corner);
+            }
+        }
         addHeader();
 
         LinearLayout body = new LinearLayout(getContext());

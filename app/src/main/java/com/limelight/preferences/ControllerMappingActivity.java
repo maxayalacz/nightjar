@@ -98,6 +98,14 @@ public class ControllerMappingActivity extends NightjarActivity {
         root.addView(resetButton);
 
         TopAppBar.addScrollingBody(page, root);
+        if (!com.limelight.ui.PortalBackgroundHelper.isRobolectric()) {
+            root.setPadding(padding, padding, padding, padding);
+            com.limelight.ui.OneUiThemeApplier.applyFrostedCard(
+                    root,
+                    com.limelight.ui.PortalBackgroundHelper.getShaderView(this),
+                    com.limelight.ui.FlowingAuroraView.CornerMode.ALL,
+                    22f);
+        }
         UiHelper.notifyNewRootView(this);
 
         selectSingleConnectedController();
@@ -199,10 +207,7 @@ public class ControllerMappingActivity extends NightjarActivity {
     }
 
     private int primaryTextColor() {
-        TypedArray attrs = obtainStyledAttributes(new int[] {android.R.attr.textColorPrimary});
-        int color = attrs.getColor(0, 0xFFFFFFFF);
-        attrs.recycle();
-        return color;
+        return com.limelight.ui.AppThemePalette.getCurrent(this).getPrimaryTextColor();
     }
 
     private void chooseConnectAs() {
@@ -275,10 +280,7 @@ public class ControllerMappingActivity extends NightjarActivity {
     }
 
     private int accentColor() {
-        TypedArray attrs = obtainStyledAttributes(new int[] {android.R.attr.colorAccent});
-        int color = attrs.getColor(0, 0xFF80CBC4);
-        attrs.recycle();
-        return color;
+        return com.limelight.ui.AppThemePalette.getCurrent(this).accent;
     }
 
     private static boolean isControllerEvent(KeyEvent event) {

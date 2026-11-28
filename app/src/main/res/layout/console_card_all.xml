@@ -30,8 +30,8 @@
                 android:maxLines="2" android:ellipsize="end" android:gravity="center"
                 android:textAppearance="@style/TextAppearance.Nightjar.Caption" android:textColor="?attr/colorOnSurfaceVariant"
                 android:importantForAccessibility="no" />
-            <ImageView android:layout_width="24dp" android:layout_height="24dp" android:layout_marginTop="@dimen/space_m"
-                android:src="@drawable/settings_chevron" app:tint="@color/night_primary"
+            <ImageView android:id="@+id/console_all_chevron" android:layout_width="24dp" android:layout_height="24dp" android:layout_marginTop="@dimen/space_m"
+                android:src="@drawable/settings_chevron" app:tint="?attr/colorPrimary"
                 android:importantForAccessibility="no" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>

@@ -133,8 +133,6 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
     boolean dispatchingDesktopTouch;
     // The on-screen controller, built the first time the controls are shown or their layout is edited.
     com.limelight.binding.input.pad.ModernController modernController;
-    com.limelight.binding.input.virtual_controller.VirtualController moonlightVirtualController;
-    com.limelight.binding.input.virtual_controller.OscLayoutEditorOverlay oscLayoutEditorOverlay;
     // An external gamepad is connected; with Hide while a controller is connected the on-screen controls leave.
     volatile boolean physicalControllerConnected;
     com.limelight.ui.MicButton micButton;
@@ -175,7 +173,16 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
             displayedFailureDialog = true;
             streamConnection.stopConnection();
             if (spinner != null) { spinner.dismiss(); spinner = null; }
-            streamRecovery.showReconnectDialog(R.string.conn_terminated_title, getString(R.string.stream_recovery_exhausted));
+            Runnable showDialog = () -> {
+                if (!isFinishing() && !isDestroyed()) {
+                    streamRecovery.showReconnectDialog(R.string.conn_terminated_title, getString(R.string.stream_recovery_exhausted));
+                }
+            };
+            if (portalOverlay != null && portalOverlay.isOverlayActive()) {
+                portalOverlay.reopenFromSonar(showDialog);
+            } else {
+                showDialog.run();
+            }
         }
     };
     int suppressPipRefCount = 0;
@@ -488,16 +495,27 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
             beginStagedExit();
         } else if (connected && !displayedFailureDialog && !isDestroyed()
                 && portalOverlay != null && !"robolectric".equalsIgnoreCase(Build.FINGERPRINT)) {
+            finishWithPortalDisconnect(() -> streamConnection.stopConnection());
+        } else {
+            exitFinished = true;
+            super.finish();
+        }
+    }
+
+    void finishWithPortalDisconnect(Runnable onBeginTeardown) {
+        if (!portalDisconnecting && !isDestroyed()
+                && portalOverlay != null && !"robolectric".equalsIgnoreCase(Build.FINGERPRINT)) {
             portalDisconnecting = true;
             touchInput.setInputGrabState(false);
             if (streamMenu != null) streamMenu.dismiss();
-            portalOverlay.startDisconnecting(() -> {
+            hideOnscreenControllers();
+            portalOverlay.startDisconnecting(onBeginTeardown, () -> {
                 exitFinished = true;
                 Game.super.finish();
                 com.limelight.utils.UiHelper.disableActivityTransition(Game.this, true);
             });
-            streamConnection.stopConnection();
         } else {
+            if (onBeginTeardown != null) onBeginTeardown.run();
             exitFinished = true;
             super.finish();
         }
@@ -960,7 +978,6 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
         }
         ((android.hardware.display.DisplayManager) getSystemService(DISPLAY_SERVICE))
                 .unregisterDisplayListener(inputDisplayListener);
-        if (oscLayoutEditorOverlay != null) { oscLayoutEditorOverlay.detach(); oscLayoutEditorOverlay = null; }
         if (portalOverlay != null) { portalOverlay.releaseAndHide(); portalOverlay = null; }
         if (spinner != null) { spinner.dismiss(); spinner = null; }
         SpinnerDialog.closeDialogs(this);
@@ -1178,11 +1195,9 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
      * controller or remote sent it.
      */
     void onBack(boolean byController) {
-        if (oscLayoutEditorOverlay != null && oscLayoutEditorOverlay.isAttached()) {
-            oscLayoutEditorOverlay.requestClose();
-        } else if (modernController != null && modernController.isEditing()) {
-            // Back leaves the layout editor without keeping its changes, as Cancel does.
-            modernController.finishEditing(false);
+        if (modernController != null && modernController.isEditing()) {
+            // Do not close PadEditor on back gesture; user exits via editor Done/Cancel buttons.
+            return;
         } else if (connected && keyboardInput.isPcKeyboardVisible()) {
             keyboardInput.hidePcKeyboard();
         } else if (connected && keyboardInput.isSystemKeyboardVisible()) {
@@ -1308,14 +1323,7 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
         // when the moving began, and hiding them now would close their open editor and drop its draft.
     }
 
-    private boolean useMoonlightOsc() {
-        return prefConfig == null || !PreferenceConfiguration.OSC_ENGINE_NIGHTJAR.equals(prefConfig.oscEngine);
-    }
-
     void hideOnscreenControllers() {
-        if (moonlightVirtualController != null) {
-            moonlightVirtualController.hide();
-        }
         if (modernController != null) {
             if (!movingGameButtons()) modernController.finishEditing(false);
             modernController.hide();
@@ -1331,20 +1339,6 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
             hideOnscreenControllers();
             return;
         }
-        if (useMoonlightOsc()) {
-            if (modernController != null) modernController.hide();
-            if (moonlightVirtualController == null) {
-                moonlightVirtualController = new com.limelight.binding.input.virtual_controller.VirtualController(
-                        controllerHandler, (FrameLayout) streamView.getParent(), this);
-                moonlightVirtualController.refreshLayout();
-            }
-            moonlightVirtualController.setConfigureButtonVisible(false);
-            moonlightVirtualController.show();
-            touchInput.updateMicButton();
-            touchInput.updateMenuButton();
-            return;
-        }
-        if (moonlightVirtualController != null) moonlightVirtualController.hide();
         ensureModernController();
         modernController.onOrientationChanged();
         modernController.show();
@@ -1352,38 +1346,13 @@ public class Game extends Activity implements SurfaceHolder.Callback, TextureVie
         touchInput.updateMenuButton();
     }
 
-    /** Launches the active OSC engine's layout editor (Moonlight OscLayoutEditorOverlay or Nightjar PadEditor) over the live stream. */
+    /** Launches Nightjar PadEditor over the live stream. */
     void startInlineOscLayoutEdit() {
         if (externalPresentation != null || streamView == null || !(streamView.getParent() instanceof FrameLayout)) {
             return;
         }
-        if (!useMoonlightOsc()) {
-            if (moonlightVirtualController != null) moonlightVirtualController.hide();
-            ensureModernController();
-            modernController.startEditing();
-            return;
-        }
-        FrameLayout root = (FrameLayout) streamView.getParent();
-        if (modernController != null) modernController.hide();
-        if (moonlightVirtualController == null) {
-            moonlightVirtualController = new com.limelight.binding.input.virtual_controller.VirtualController(
-                    controllerHandler, root, this);
-            moonlightVirtualController.refreshLayout();
-        }
-        moonlightVirtualController.setConfigureButtonVisible(false);
-        if (!moonlightVirtualController.isVisible()) {
-            moonlightVirtualController.show();
-        }
-        if (oscLayoutEditorOverlay != null && oscLayoutEditorOverlay.isAttached()) {
-            oscLayoutEditorOverlay.refreshAfterControllerRemount();
-            return;
-        }
-        oscLayoutEditorOverlay = new com.limelight.binding.input.virtual_controller.OscLayoutEditorOverlay(
-                this,
-                root,
-                moonlightVirtualController,
-                () -> oscLayoutEditorOverlay = null);
-        oscLayoutEditorOverlay.attach();
+        ensureModernController();
+        modernController.startEditing();
     }
 
     /** Builds the on-screen controller without showing it, so its layout can be edited while a gamepad hides it. */

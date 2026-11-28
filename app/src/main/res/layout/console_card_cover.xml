@@ -16,7 +16,7 @@
                 <ImageView android:id="@+id/console_star" android:layout_width="@dimen/card_chip_height"
                     android:layout_height="@dimen/card_chip_height" android:layout_marginEnd="@dimen/space_xs"
                     android:padding="5dp" android:background="@drawable/bg_card_star"
-                    android:src="@drawable/ic_star_filled" app:tint="@color/nj_color_moon"
+                    android:src="@drawable/ic_star_filled" app:tint="?attr/colorPrimary"
                     android:visibility="gone" android:importantForAccessibility="no" />
                 <com.limelight.ui.StatusDisc android:id="@+id/console_badge" android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:visibility="gone" android:importantForAccessibility="no" />

@@ -131,6 +131,7 @@ public class PreferenceConfiguration {
     static final String CAPTURE_SYSTEM_KEYS_PREF_STRING = "checkbox_capture_system_keys";
     static final String SYSTEM_KEYS_FULLSCREEN_ONLY_PREF_STRING = "checkbox_system_keys_fullscreen_only";
     private static final String RIGHT_ALT_AS_META_PREF_STRING = "checkbox_right_alt_as_meta";
+    private static final String CHECKBOX_IGNORE_SYNTH_EVENTS = "checkbox_ignore_synth_events";
     private static final String KEYBOARD_FOLLOWS_TEXT_FIELDS_PREF_STRING = "checkbox_keyboard_follows_text_fields";
     static final String CLIPBOARD_SYNC_PREF_STRING = "checkbox_clipboard_sync";
     private static final String ANALOG_SCROLLING_PREF_STRING = "analog_scrolling";
@@ -303,6 +304,7 @@ public class PreferenceConfiguration {
     private static final boolean DEFAULT_GAMEPAD_TOUCHPAD_AS_MOUSE = false;
     private static final boolean DEFAULT_GAMEPAD_MOTION_SENSORS = true;
     private static final boolean DEFAULT_GAMEPAD_MOTION_FALLBACK = false;
+    private static final boolean DEFAULT_IGNORE_SYNTH_EVENTS = false;
 
     public static final int FRAME_PACING_MIN_LATENCY = 0;
     public static final int FRAME_PACING_BALANCED = 1;
@@ -452,6 +454,7 @@ public class PreferenceConfiguration {
     }
 
     public boolean rightAltAsMeta;
+    public boolean ignoreSynthEvents;
     public boolean keyboardFollowsTextFields;
     // Clipboard sync (0x5508) with a Rubylight PC that offers it.
     public boolean clipboardSync;
@@ -1840,6 +1843,7 @@ public class PreferenceConfiguration {
         config.captureSystemKeys = prefs.getBoolean(CAPTURE_SYSTEM_KEYS_PREF_STRING, true);
         config.systemKeysFullscreenOnly = prefs.getBoolean(SYSTEM_KEYS_FULLSCREEN_ONLY_PREF_STRING, false);
         config.rightAltAsMeta = prefs.getBoolean(RIGHT_ALT_AS_META_PREF_STRING, false);
+        config.ignoreSynthEvents = prefs.getBoolean(CHECKBOX_IGNORE_SYNTH_EVENTS, DEFAULT_IGNORE_SYNTH_EVENTS);
         config.keyboardFollowsTextFields = prefs.getBoolean(KEYBOARD_FOLLOWS_TEXT_FIELDS_PREF_STRING, true);
         config.clipboardSync = prefs.getBoolean(CLIPBOARD_SYNC_PREF_STRING, false);
         config.mouseNavButtons = prefs.getBoolean(MOUSE_NAV_BUTTONS_STRING, DEFAULT_MOUSE_NAV_BUTTONS);
@@ -1998,9 +2002,6 @@ public class PreferenceConfiguration {
     public static final String UI_PERFORMANCE_MODE_PREF_STRING = "checkbox_ui_performance_mode";
     public static final String UI_BATTERY_SAVER_PREF_STRING = "list_ui_battery_saver";
     public static final String PORTAL_SHOW_COVER_BACKDROP_PREF_STRING = "checkbox_portal_show_cover_backdrop";
-    public static final String OSC_ENGINE_PREF_STRING = "list_osc_engine";
-    public static final String OSC_ENGINE_MOONLIGHT = "moonlight";
-    public static final String OSC_ENGINE_NIGHTJAR = "nightjar";
     public static final String OSC_LIVE_BLUR_PREF_STRING = "checkbox_osc_live_blur";
     public static final String OSC_BLUR_AMOUNT_PREF_STRING = "seekbar_osc_blur_amount";
     public static final String OSC_BLUR_RESOLUTION_PERCENT_PREF_STRING = "seekbar_osc_blur_resolution_percent";
@@ -2043,7 +2044,6 @@ public class PreferenceConfiguration {
     public static final boolean DEFAULT_UI_PERFORMANCE_MODE = false;
     public static final String DEFAULT_UI_BATTERY_SAVER = "auto";
     public static final boolean DEFAULT_PORTAL_SHOW_COVER_BACKDROP = false;
-    public static final String DEFAULT_OSC_ENGINE = OSC_ENGINE_MOONLIGHT;
     public static final boolean DEFAULT_OSC_LIVE_BLUR = false;
     public static final int DEFAULT_OSC_BLUR_AMOUNT = 60;
     public static final int DEFAULT_OSC_BLUR_RESOLUTION_PERCENT = 15;
@@ -2088,13 +2088,11 @@ public class PreferenceConfiguration {
     public boolean isUiBatterySaverEffective;
     public boolean isUiPerformanceModeEffective;
     public boolean portalShowCoverBackdrop;
-    public String oscEngine;
     public boolean oscLiveBlur;
     public int oscBlurAmountPercent;
     public int oscBlurResolutionPercent;
     public String oscBlurFramerate;
     public int oscOutlineThicknessPercent;
-    public boolean enableNewAnalogStick;
     public boolean enableOnScreenStyleOfficial;
     public boolean enableKeyboardSquare;
 
@@ -2158,7 +2156,6 @@ public class PreferenceConfiguration {
         config.isUiBatterySaverEffective = isUiBatterySaverEffective(context, config.uiBatterySaverMode);
         config.isUiPerformanceModeEffective = config.uiPerformanceMode && !config.isUiBatterySaverEffective;
         config.portalShowCoverBackdrop = prefs.getBoolean(PORTAL_SHOW_COVER_BACKDROP_PREF_STRING, DEFAULT_PORTAL_SHOW_COVER_BACKDROP);
-        config.oscEngine = prefs.getString(OSC_ENGINE_PREF_STRING, DEFAULT_OSC_ENGINE);
         config.oscLiveBlur = prefs.getBoolean(OSC_LIVE_BLUR_PREF_STRING, DEFAULT_OSC_LIVE_BLUR);
         config.oscBlurAmountPercent = Math.max(0, Math.min(100,
                 prefs.getInt(OSC_BLUR_AMOUNT_PREF_STRING, DEFAULT_OSC_BLUR_AMOUNT)));
@@ -2166,7 +2163,6 @@ public class PreferenceConfiguration {
                 prefs.getInt(OSC_BLUR_RESOLUTION_PERCENT_PREF_STRING, DEFAULT_OSC_BLUR_RESOLUTION_PERCENT)));
         config.oscBlurFramerate = prefs.getString(OSC_BLUR_FRAMERATE_PREF_STRING, DEFAULT_OSC_BLUR_FRAMERATE);
         config.oscOutlineThicknessPercent = prefs.getInt(OSC_OUTLINE_THICKNESS_PREF_STRING, DEFAULT_OSC_OUTLINE_THICKNESS);
-        config.enableNewAnalogStick = prefs.getBoolean("checkbox_enable_analog_stick_new", false);
         config.enableOnScreenStyleOfficial = prefs.getBoolean("checkbox_onscreen_style_official", false);
         config.enableKeyboardSquare = prefs.getBoolean("checkbox_keyboard_square", false);
     }

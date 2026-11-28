@@ -3,14 +3,12 @@ package com.limelight.ui;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
-import android.graphics.LinearGradient;
 import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 
 import androidx.core.content.res.ResourcesCompat;
@@ -27,7 +25,6 @@ public final class GlassPanelDrawable extends Drawable {
     private GlassSpec spec;
     private final float[] radii;
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint sheen = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint rim = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint hairline = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path shape = new Path();
@@ -69,6 +66,7 @@ public final class GlassPanelDrawable extends Drawable {
     }
 
     private GlassPanelDrawable(Context context, float[] radii, GlassSpec spec) {
+        this.panelContext = context;
         this.radii = radii;
         this.spec = spec;
         overStream = true;

@@ -212,9 +212,6 @@ final class GameMenuActions {
             int clamped = Math.max(0, Math.min(100, opacity));
             if (game.prefConfig != null) game.prefConfig.oscOpacity = clamped;
             prefs().edit().putInt("seekbar_osc_opacity", clamped).apply();
-            if (game.moonlightVirtualController != null) {
-                game.moonlightVirtualController.setOpacity(clamped);
-            }
             if (game.modernController != null) {
                 game.modernController.refreshLiveVisuals();
             }
@@ -227,9 +224,6 @@ final class GameMenuActions {
             prefs().edit().putInt(
                     com.limelight.preferences.PreferenceConfiguration.OSC_OUTLINE_THICKNESS_PREF_STRING,
                     clamped).apply();
-            if (game.moonlightVirtualController != null) {
-                game.moonlightVirtualController.refreshLayout();
-            }
             if (game.modernController != null) {
                 game.modernController.refreshLiveVisuals();
             }
@@ -247,16 +241,11 @@ final class GameMenuActions {
         @Override
         public void setFreeAnalogStickLive(boolean enabled) {
             if (game.prefConfig != null) {
-                game.prefConfig.enableNewAnalogStick = enabled;
                 game.prefConfig.oscFloatingSticks = enabled;
             }
             prefs().edit()
-                    .putBoolean("checkbox_enable_analog_stick_new", enabled)
                     .putString("list_osc_stick_mode", enabled ? "floating" : "fixed")
                     .apply();
-            if (game.moonlightVirtualController != null) {
-                game.moonlightVirtualController.refreshLayout();
-            }
             if (game.modernController != null) {
                 game.modernController.refreshLiveVisuals();
             }
@@ -268,10 +257,6 @@ final class GameMenuActions {
             prefs().edit().putBoolean(
                     com.limelight.preferences.PreferenceConfiguration.OSC_LIVE_BLUR_PREF_STRING,
                     enabled).apply();
-            if (game.moonlightVirtualController != null) {
-                game.moonlightVirtualController.getLiveBlurHelper().refreshBlurPreferenceNow();
-                game.moonlightVirtualController.refreshLayout();
-            }
             if (game.modernController != null) {
                 game.modernController.refreshLiveBlurPreferences();
             }
@@ -284,9 +269,6 @@ final class GameMenuActions {
             prefs().edit().putInt(
                     com.limelight.preferences.PreferenceConfiguration.OSC_BLUR_AMOUNT_PREF_STRING,
                     clamped).apply();
-            if (game.moonlightVirtualController != null) {
-                game.moonlightVirtualController.getLiveBlurHelper().refreshBlurPreferenceNow();
-            }
             if (game.modernController != null) {
                 game.modernController.refreshLiveBlurPreferences();
             }
@@ -299,9 +281,6 @@ final class GameMenuActions {
             prefs().edit().putInt(
                     com.limelight.preferences.PreferenceConfiguration.OSC_BLUR_RESOLUTION_PERCENT_PREF_STRING,
                     clamped).apply();
-            if (game.moonlightVirtualController != null) {
-                game.moonlightVirtualController.getLiveBlurHelper().refreshBlurPreferenceNow();
-            }
             if (game.modernController != null) {
                 game.modernController.refreshLiveBlurPreferences();
             }
@@ -313,29 +292,8 @@ final class GameMenuActions {
             prefs().edit().putString(
                     com.limelight.preferences.PreferenceConfiguration.OSC_BLUR_FRAMERATE_PREF_STRING,
                     fps).apply();
-            if (game.moonlightVirtualController != null) {
-                game.moonlightVirtualController.getLiveBlurHelper().refreshBlurPreferenceNow();
-            }
             if (game.modernController != null) {
                 game.modernController.refreshLiveBlurPreferences();
-            }
-        }
-
-        @Override
-        public String getOscEngine() {
-            return game.prefConfig != null && game.prefConfig.oscEngine != null
-                    ? game.prefConfig.oscEngine
-                    : com.limelight.preferences.PreferenceConfiguration.DEFAULT_OSC_ENGINE;
-        }
-
-        @Override
-        public void setOscEngineLive(String engine) {
-            if (game.prefConfig != null) game.prefConfig.oscEngine = engine;
-            prefs().edit().putString(
-                    com.limelight.preferences.PreferenceConfiguration.OSC_ENGINE_PREF_STRING,
-                    engine).apply();
-            if (isOscVisible()) {
-                game.showOnscreenController();
             }
         }
 

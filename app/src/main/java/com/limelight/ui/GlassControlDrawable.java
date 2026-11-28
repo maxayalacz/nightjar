@@ -3,13 +3,11 @@ package com.limelight.ui;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
-import android.graphics.LinearGradient;
 import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 
 import androidx.core.content.res.ResourcesCompat;
@@ -83,7 +81,7 @@ final class GlassControlDrawable extends Drawable {
         AppThemePalette palette = AppThemePalette.getCurrent(context);
         boolean liveBlur = AppThemePalette.isLiveBlurEffective(context);
         int cardFill = palette.getFrostedCardTint(0x52121826);
-        int outline = palette.cardOutline;
+        int outline = palette.getCardRimColor();
         float outlineScale = Math.max(0f, com.limelight.preferences.PreferenceConfiguration
                 .readPreferences(context).cardOutlineThicknessPercent / 100f);
         rim.setStrokeWidth(outlineScale <= 0f ? 0f : Math.max(1f, res.getDisplayMetrics().density * outlineScale));
@@ -122,14 +120,9 @@ final class GlassControlDrawable extends Drawable {
     }
 
     private void applyRim() {
-        Rect b = getBounds();
-        int top = checked ? checkedRimTop : rimTop;
-        if (b.isEmpty() || (top == 0 && rimMid == 0)) {
-            rim.setShader(null);
-            return;
-        }
-        rim.setShader(new LinearGradient(0, b.top, 0, b.bottom, new int[] {top, rimMid, rimBottom},
-                new float[] {0f, 0.45f, 1f}, Shader.TileMode.CLAMP));
+        int rimColor = checked ? checkedRimTop : rimTop;
+        rim.setShader(null);
+        rim.setColor(rimColor);
     }
 
     @Override
@@ -201,7 +194,7 @@ final class GlassControlDrawable extends Drawable {
             rect.set(b.left + half, b.top + half, b.right - half, b.bottom - half);
             float r = corner(b.width(), b.height(), half);
             canvas.drawRoundRect(rect, r, r, ring);
-        } else if (rim.getShader() != null) {
+        } else if ((rim.getColor() >>> 24) != 0 && rim.getStrokeWidth() > 0f) {
             float half = rim.getStrokeWidth() / 2f;
             rect.set(b.left + half, b.top + half, b.right - half, b.bottom - half);
             float r = corner(b.width(), b.height(), half);

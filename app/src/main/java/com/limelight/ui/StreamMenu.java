@@ -1134,13 +1134,17 @@ public final class StreamMenu {
         cap.setMinimumWidth(0);
         cap.setPadding(0, 0, 0, 0);
         cap.setCheckable(true);
+        AppThemePalette palette = AppThemePalette.getCurrent(activity);
         int[][] states = {new int[] {android.R.attr.state_checked}, new int[] {}};
         cap.setBackgroundTintList(new android.content.res.ColorStateList(states, new int[] {
-                com.google.android.material.color.MaterialColors.getColor(activity, com.google.android.material.R.attr.colorPrimaryContainer, 0),
+                AppThemePalette.withAlphaInt(palette.accent, 0x5C),
                 android.graphics.Color.TRANSPARENT}));
+        cap.setStrokeColor(new android.content.res.ColorStateList(states, new int[] {
+                palette.highlight,
+                palette.getCardRimColor()}));
         cap.setTextColor(new android.content.res.ColorStateList(states, new int[] {
-                com.google.android.material.color.MaterialColors.getColor(activity, com.google.android.material.R.attr.colorOnPrimaryContainer, 0),
-                com.google.android.material.color.MaterialColors.getColor(activity, com.google.android.material.R.attr.colorOnSurface, 0)}));
+                palette.highlight,
+                palette.getPrimaryTextColor()}));
         caps.addView(cap);
         keyCaps.put(name, cap);
         cap.setOnClickListener(view -> toggleKey(name));

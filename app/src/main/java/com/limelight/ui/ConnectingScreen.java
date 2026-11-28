@@ -89,6 +89,13 @@ public final class ConnectingScreen {
         cancel = dialog.findViewById(R.id.conn_cancel);
         stage = dialog.findViewById(R.id.conn_stage);
         panel = dialog.findViewById(R.id.conn_panel);
+        if (panel != null && !PortalBackgroundHelper.isRobolectric()) {
+            OneUiThemeApplier.applyFrostedCard(
+                    panel,
+                    PortalBackgroundHelper.getShaderView(activity),
+                    FlowingAuroraView.CornerMode.ALL,
+                    24f);
+        }
         ((TextView) dialog.findViewById(R.id.conn_title)).setText(this.title);
         TextView pcName = dialog.findViewById(R.id.conn_pc);
         pcName.setText(pc);

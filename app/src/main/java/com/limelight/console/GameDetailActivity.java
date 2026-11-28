@@ -267,6 +267,24 @@ public class GameDetailActivity extends NightjarActivity implements HostFeed.Lis
         installed = findViewById(R.id.detail_installed);
         hdr = findViewById(R.id.detail_hdr);
         store = findViewById(R.id.detail_store);
+        if (!com.limelight.ui.PortalBackgroundHelper.isRobolectric()) {
+            com.limelight.ui.PortalShaderView psv = com.limelight.ui.PortalBackgroundHelper.getShaderView(this);
+            View detailSheet = findViewById(R.id.detail_sheet);
+            if (detailSheet != null) {
+                com.limelight.ui.OneUiThemeApplier.applyFrostedCard(
+                        detailSheet, psv, com.limelight.ui.FlowingAuroraView.CornerMode.ALL, 24f);
+            }
+            if (profileRow != null) {
+                com.limelight.ui.OneUiThemeApplier.applyFrostedCard(
+                        profileRow, psv, com.limelight.ui.FlowingAuroraView.CornerMode.ALL, 18f);
+            }
+            for (View chipView : new View[] {status, installed, hdr, store}) {
+                if (chipView != null) {
+                    com.limelight.ui.OneUiThemeApplier.applyFrostedCard(
+                            chipView, psv, com.limelight.ui.FlowingAuroraView.CornerMode.ALL, 999f);
+                }
+            }
+        }
         backdrop = findViewById(R.id.detail_backdrop);
         if (backdrop != null) setUpAmbience();
         play.setOnClickListener(v -> onPlay());

@@ -102,6 +102,15 @@ public final class FolderBrowserActivity extends NightjarActivity {
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         TopAppBar.addScrollingBody(page, content);
+        if (!com.limelight.ui.PortalBackgroundHelper.isRobolectric()) {
+            int pad = Math.round(UiHelper.dpToPx(this, 16f));
+            content.setPadding(pad, pad, pad, pad);
+            com.limelight.ui.OneUiThemeApplier.applyFrostedCard(
+                    content,
+                    com.limelight.ui.PortalBackgroundHelper.getShaderView(this),
+                    com.limelight.ui.FlowingAuroraView.CornerMode.ALL,
+                    22f);
+        }
         work = new ViewModelProvider(this).get(FolderWork.class);
         work.changed.observe(this, ignored -> refresh());
         work.progressed.observe(this, run -> { if (run != null && run == work.transfer) showProgress(run); });

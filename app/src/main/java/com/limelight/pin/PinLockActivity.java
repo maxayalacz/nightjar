@@ -269,6 +269,7 @@ public class PinLockActivity extends NightjarActivity {
         for (int i = 0; i < ids.length; i++) {
             MaterialButton key = findViewById(ids[i]);
             keys[i] = key;
+            stylePinKey(key, false);
             if (i < 10) {
                 final int digit = i;
                 key.setText(String.format(Locale.getDefault(), "%d", digit));
@@ -288,18 +289,36 @@ public class PinLockActivity extends NightjarActivity {
         }
     }
 
+    private void stylePinKey(MaterialButton button, boolean accent) {
+        com.limelight.ui.AppThemePalette palette = com.limelight.ui.AppThemePalette.getCurrent(this);
+        float radius = getResources().getDimension(R.dimen.nj_radius_capsule);
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        bg.setCornerRadius(radius);
+        if (accent) {
+            bg.setColor(palette.accent);
+            int onAccent = androidx.core.graphics.ColorUtils.calculateLuminance(palette.accent) > 0.45
+                    ? 0xFF0B0E14 : 0xFFFFFFFF;
+            button.setTextColor(onAccent);
+            button.setIconTint(android.content.res.ColorStateList.valueOf(onAccent));
+        } else {
+            bg.setColor(palette.getFrostedCardTint(0x52121826));
+            bg.setStroke(Math.max(1, Math.round(UiHelper.dpToPx(this, 1f))), palette.getCardRimColor());
+            button.setTextColor(palette.getPrimaryTextColor());
+            button.setIconTint(android.content.res.ColorStateList.valueOf(palette.getPrimaryTextColor()));
+        }
+        button.setBackgroundTintList(null);
+        button.setBackground(bg);
+    }
+
     private void updateDots() {
         dots.showMasked(count);
         dots.setContentDescription(getString(R.string.pin_dots_description, count, dotCount));
-        // A new PIN has no known length: the check is the way on once it is long enough, so it takes the moon.
+        // A new PIN has no known length: the check is the way on once it is long enough, so it takes the accent.
         boolean ready = purpose == Purpose.SET && count >= PinStore.MIN_DIGITS;
         if (ready != confirmReady) {
             confirmReady = ready;
-            MaterialButton confirm = keys[11];
-            confirm.setBackgroundResource(ready ? R.drawable.dialog_button_moon : R.drawable.dialog_button_control);
-            confirm.setIconTint(android.content.res.ColorStateList.valueOf(ready
-                    ? androidx.core.content.ContextCompat.getColor(this, R.color.nj_color_on_moon)
-                    : MaterialColors.getColor(confirm, com.google.android.material.R.attr.colorOnSurface)));
+            stylePinKey(keys[11], ready);
         }
     }
 

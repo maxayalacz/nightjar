@@ -4,11 +4,11 @@
     <item android:state_focused="true">
         <layer-list>
             <item><shape><corners android:radius="@dimen/nj_radius_capsule" /><stroke android:width="@dimen/dialog_button_ring" android:color="?attr/glassRingOnMoon" /></shape></item>
-            <item android:left="@dimen/dialog_button_gap" android:top="@dimen/dialog_button_gap" android:right="@dimen/dialog_button_gap" android:bottom="@dimen/dialog_button_gap"><shape><corners android:radius="@dimen/nj_radius_capsule" /><gradient android:angle="270" android:startColor="@color/nj_color_moon_hi" android:endColor="@color/glass_moon_low" /></shape></item>
+            <item android:left="@dimen/dialog_button_gap" android:top="@dimen/dialog_button_gap" android:right="@dimen/dialog_button_gap" android:bottom="@dimen/dialog_button_gap"><shape><corners android:radius="@dimen/nj_radius_capsule" /><solid android:color="?attr/colorPrimary" /></shape></item>
         </layer-list>
     </item>
     <item android:state_pressed="true" android:drawable="@drawable/dialog_button_moon_pressed" />
     <item android:state_hovered="true" android:drawable="@drawable/dialog_button_moon_pressed" />
     <item android:state_enabled="false"><shape><corners android:radius="@dimen/nj_radius_capsule" /><solid android:color="?attr/glassControlFill" /></shape></item>
-    <item><shape><corners android:radius="@dimen/nj_radius_capsule" /><gradient android:angle="270" android:startColor="@color/nj_color_moon_hi" android:endColor="@color/glass_moon_low" /></shape></item>
+    <item><shape><corners android:radius="@dimen/nj_radius_capsule" /><solid android:color="?attr/colorPrimary" /></shape></item>
 </selector>

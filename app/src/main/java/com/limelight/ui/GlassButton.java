@@ -61,12 +61,7 @@ public class GlassButton extends MaterialButton {
         GradientDrawable shape = new GradientDrawable();
         shape.setCornerRadius(res.getDimension(R.dimen.nj_radius_capsule));
         if (moon) {
-            if (highContrast) {
-                shape.setColor(palette.accent);
-            } else {
-                shape.setOrientation(GradientDrawable.Orientation.TOP_BOTTOM);
-                shape.setColors(new int[] {palette.highlight, palette.accent});
-            }
+            shape.setColor(palette.accent);
             int onAccent = androidx.core.graphics.ColorUtils.calculateLuminance(palette.accent) > 0.45
                     ? 0xFF0B0E14 : 0xFFFFFFFF;
             setTextColor(onAccent);

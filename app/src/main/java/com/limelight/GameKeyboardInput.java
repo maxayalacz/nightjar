@@ -519,6 +519,10 @@ final class GameKeyboardInput {
             return false;
         }
 
+        if (game.prefConfig.ignoreSynthEvents && event.getDeviceId() <= 0) {
+            return false;
+        }
+
         // Handle a synthetic back button event that some Android OS versions
         // create as a result of a right-click. This event WILL repeat if
         // the right mouse button is held down, so we ignore those.
@@ -601,6 +605,10 @@ final class GameKeyboardInput {
         if ((pcKeyboardKeys.size() > 0 || isPcKeyboardVisible()) && handlePcKeyboardKey(event)) return true;
         // Pass-through virtual navigation keys
         if ((event.getFlags() & KeyEvent.FLAG_VIRTUAL_HARD_KEY) != 0) {
+            return false;
+        }
+
+        if (game.prefConfig.ignoreSynthEvents && event.getDeviceId() <= 0) {
             return false;
         }
 

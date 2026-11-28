@@ -780,16 +780,26 @@ final class GameConnection {
             game.spinner = null;
         }
         android.content.Intent intent = game.getIntent();
-        if (game.portalOverlay != null && !"robolectric".equalsIgnoreCase(android.os.Build.FINGERPRINT)) {
-            String appName = intent.getStringExtra(Game.EXTRA_APP_NAME);
-            String pcName = intent.getStringExtra(Game.EXTRA_PC_NAME);
+        if (game.portalOverlay != null && !com.limelight.ui.PortalBackgroundHelper.isRobolectric()) {
+            if (game.portalOverlay.isOverlayActive()) {
+                game.portalOverlay.updateStageMessage(detail);
+                return null;
+            }
+            String appName = intent != null ? intent.getStringExtra(Game.EXTRA_APP_NAME) : null;
+            String pcName = intent != null ? intent.getStringExtra(Game.EXTRA_PC_NAME) : null;
             String title = (appName != null && !appName.isEmpty()) ? appName : pcName;
-            game.portalOverlay.startConnecting(title, detail, () -> {
+            Runnable onCancel = () -> {
                 if (game.portalOverlay != null) {
                     game.portalOverlay.cancelWithReopen();
                 }
                 game.finish();
-            }, null);
+            };
+            if (intent != null && intent.getBooleanExtra(GameRecovery.EXTRA_PORTAL_RESUME_SONAR, false)) {
+                intent.removeExtra(GameRecovery.EXTRA_PORTAL_RESUME_SONAR);
+                game.portalOverlay.resumeInSonar(title, detail, onCancel);
+            } else {
+                game.portalOverlay.startConnecting(title, detail, onCancel, null);
+            }
             return null;
         }
         com.limelight.ui.ConnectingScreen screen = com.limelight.ui.ConnectingScreen.show(game, intent.getStringExtra(Game.EXTRA_APP_NAME),
@@ -1086,15 +1096,15 @@ final class GameConnection {
                 if (transientRecoveryFailure && game.streamRecovery.tryAutomaticRecovery()) return;
                 // The recovery's last attempt failed here: the dialog says why, then that it stopped.
                 final boolean recoveryExhausted = transientRecoveryFailure && game.recoveryBudgetExhausted;
-                if (game.portalOverlay != null && game.portalOverlay.isOverlayActive()) {
-                    game.portalOverlay.releaseAndHide();
-                }
                 if (game.spinner != null) {
                     game.spinner.dismiss();
                     game.spinner = null;
                 }
 
                 if (!game.displayedFailureDialog && !game.foreground) {
+                    if (game.portalOverlay != null && game.portalOverlay.isOverlayActive()) {
+                        game.portalOverlay.releaseAndHide();
+                    }
                     game.displayedFailureDialog = true;
                     stopConnection();
                     game.finish();
@@ -1135,7 +1145,16 @@ final class GameConnection {
                     }
 
                     stopConnection();
-                    game.streamRecovery.showReconnectDialog(R.string.conn_error_title, dialogText);
+                    final String finalDialogText = dialogText;
+                    if (game.portalOverlay != null && game.portalOverlay.isOverlayActive()) {
+                        game.portalOverlay.reopenFromSonar(() -> {
+                            if (!game.isFinishing() && !game.isDestroyed()) {
+                                game.streamRecovery.showReconnectDialog(R.string.conn_error_title, finalDialogText);
+                            }
+                        });
+                    } else {
+                        game.streamRecovery.showReconnectDialog(R.string.conn_error_title, finalDialogText);
+                    }
                 }
             }
         });
@@ -1255,6 +1274,10 @@ final class GameConnection {
         game.touchInput.setInputGrabState(false);
 
         if (!game.displayedFailureDialog) {
+            if (movedTo == null && errorCode == MoonBridge.ML_ERROR_GRACEFUL_TERMINATION) {
+                game.finishWithPortalDisconnect(this::stopConnection);
+                return;
+            }
             game.displayedFailureDialog = true;
             stopConnection();
 

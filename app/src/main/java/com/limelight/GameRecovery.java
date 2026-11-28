@@ -59,6 +59,9 @@ final class GameRecovery {
     // connected for} as the trip began, which the resumed activity starts with.
     private static final String EXTRA_TRIP_BUDGET = "rubylight.tripBudget";
 
+    // Tells the incoming retry Game Activity to resume seamlessly in Portal Sonar without restarting.
+    public static final String EXTRA_PORTAL_RESUME_SONAR = "com.limelight.PORTAL_RESUME_SONAR";
+
     void rememberMicrophoneMute() {
         if (game.conn != null && (game.connected || game.connecting)) {
             game.getIntent().putExtra(Game.EXTRA_MICROPHONE_MUTED, game.conn.isMicrophoneMutedForReconnect());
@@ -81,6 +84,7 @@ final class GameRecovery {
         again.removeExtra(Game.EXTRA_TRIP_RESUME_STARTED);
         // Only the press that asked for it joins: a recovery checks what it finds.
         again.removeExtra(EXTRA_JOIN_RUNNING);
+        again.removeExtra(EXTRA_PORTAL_RESUME_SONAR);
         putSessionBitrate(again, false);
         return again;
     }
@@ -238,16 +242,33 @@ final class GameRecovery {
      * new stream rather than handing this one a new intent.
      */
     void handOff(Intent next) {
+        boolean portalActive = game.portalOverlay != null && game.portalOverlay.isOverlayActive();
+        if (portalActive) {
+            game.portalOverlay.captureHandoffFrame();
+            next.putExtra(EXTRA_PORTAL_RESUME_SONAR, true);
+        }
         boolean multiWindow = game.isInMultiWindowMode();
         boolean pictureInPicture = game.isInPictureInPictureMode();
         boolean inPlace = handsOffInPlace(game.isTaskRoot(), multiWindow, pictureInPicture);
         Intent start = handOffIntent(next, game.getComponentName(), inPlace);
         if (inPlace) {
             game.startActivity(start);
+            if (portalActive) {
+                com.limelight.utils.UiHelper.disableActivityTransition(game, false);
+            }
             game.finishNow();
+            if (portalActive) {
+                com.limelight.utils.UiHelper.disableActivityTransition(game, true);
+            }
         } else {
             game.finishNow();
+            if (portalActive) {
+                com.limelight.utils.UiHelper.disableActivityTransition(game, true);
+            }
             game.startActivity(start);
+            if (portalActive) {
+                com.limelight.utils.UiHelper.disableActivityTransition(game, false);
+            }
         }
     }
 
@@ -597,13 +618,31 @@ final class GameRecovery {
         final String routeHost = game.getIntent().getStringExtra(Game.EXTRA_HOST);
         final int routePort = game.getIntent().getIntExtra(Game.EXTRA_PORT, NvHTTP.DEFAULT_HTTP_PORT);
 
+        final String statusMessage = tripResume ?
+                game.getString(R.string.stream_reconnecting) :
+                game.getString(R.string.stream_recovery_attempt, game.recoveryPolicy.attempts(), StreamRecoveryPolicy.MAX_ATTEMPTS);
+
         game.displayedFailureDialog = true;
         game.touchInput.setInputGrabState(false);
+        boolean portalHandled = false;
+        if (game.portalOverlay != null && game.portalOverlay.isOverlayActive()) {
+            game.portalOverlay.updateStageMessage(statusMessage);
+            portalHandled = true;
+        } else if (game.connected && game.portalOverlay != null && !com.limelight.ui.PortalBackgroundHelper.isRobolectric()) {
+            String appName = game.getIntent() != null ? game.getIntent().getStringExtra(Game.EXTRA_APP_NAME) : null;
+            String pcName = game.getIntent() != null ? game.getIntent().getStringExtra(Game.EXTRA_PC_NAME) : null;
+            String title = (appName != null && !appName.isEmpty()) ? appName : pcName;
+            game.portalOverlay.startReconnecting(title, statusMessage, () -> {
+                cancelAutomaticRecovery();
+                game.finish();
+            });
+            portalHandled = true;
+        }
         game.streamConnection.stopConnection();
-        if (game.spinner != null) game.spinner.dismiss();
-        game.spinner = game.streamConnection.showConnecting(tripResume ?
-                game.getString(R.string.stream_reconnecting) :
-                game.getString(R.string.stream_recovery_attempt, game.recoveryPolicy.attempts(), StreamRecoveryPolicy.MAX_ATTEMPTS));
+        if (!portalHandled) {
+            if (game.spinner != null) game.spinner.dismiss();
+            game.spinner = game.streamConnection.showConnecting(statusMessage);
+        }
         retry.putExtra(Game.EXTRA_MICROPHONE_MUTED, game.getIntent().getBooleanExtra(Game.EXTRA_MICROPHONE_MUTED, false));
         pendingRecoveryIntent = retry;
         final int generation = game.foregroundGeneration;
@@ -630,8 +669,16 @@ final class GameRecovery {
                             SystemClock.elapsedRealtime() - deadlineFrom >= StreamRecoveryPolicy.WINDOW_MS) {
                         game.recoveryHandoffInProgress = false;
                         if (game.spinner != null) { game.spinner.dismiss(); game.spinner = null; }
-                        showReconnectDialog(R.string.conn_terminated_title,
-                                gaveUpText(game.getString(R.string.stream_recovery_unreachable)));
+                        final String gaveUpMsg = gaveUpText(game.getString(R.string.stream_recovery_unreachable));
+                        if (game.portalOverlay != null && game.portalOverlay.isOverlayActive()) {
+                            game.portalOverlay.reopenFromSonar(() -> {
+                                if (!game.isFinishing() && !game.isDestroyed()) {
+                                    showReconnectDialog(R.string.conn_terminated_title, gaveUpMsg);
+                                }
+                            });
+                        } else {
+                            showReconnectDialog(R.string.conn_terminated_title, gaveUpMsg);
+                        }
                         return;
                     }
                     game.recoveryHandoffInProgress = false;
@@ -705,6 +752,18 @@ final class GameRecovery {
     }
 
     void showReconnectDialog(int title, String message) {
+        if (game.portalOverlay != null && game.portalOverlay.isOverlayActive()) {
+            game.portalOverlay.reopenFromSonar(() -> {
+                if (!game.isFinishing() && !game.isDestroyed()) {
+                    showReconnectDialogNow(title, message);
+                }
+            });
+            return;
+        }
+        showReconnectDialogNow(title, message);
+    }
+
+    private void showReconnectDialogNow(int title, String message) {
         if (title != R.string.conn_error_title) {
             // A stream that was running and ended: its message speaks of Reconnect, and this is no failed start.
             game.menuActions.showStreamDialog(new NavigationDialogBuilder(game).setTitle(title).setMessage(message)

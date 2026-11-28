@@ -55,19 +55,21 @@ public class OrbitView extends FrameLayout {
         ringsStart = a.getFloat(R.styleable.OrbitView_orbitRingsStart, 0.72f);
         a.recycle();
         float density = getResources().getDisplayMetrics().density;
-        boolean day = AppTheme.look(context) == AppTheme.Look.DAY;
+        AppThemePalette palette = AppThemePalette.getCurrent(context);
         ring.setStyle(Paint.Style.STROKE);
         ring.setStrokeWidth(Math.max(1f, density * 0.75f));
-        ring.setColor(ResourcesCompat.getColor(getResources(), day ? R.color.nj_day_sky_ring : R.color.nj_sky_ring, null));
+        ring.setColor(palette.getCardRimColor());
         bird = drawMoon ? ResourcesCompat.getDrawable(getResources(), R.drawable.ic_glass_bird, context.getTheme()) : null;
         if (bird != null) {
-            bird.mutate().setTint(ResourcesCompat.getColor(getResources(), R.color.nj_color_on_moon, null));
+            int onAccent = androidx.core.graphics.ColorUtils.calculateLuminance(palette.accent) > 0.45
+                    ? 0xFF0B0E14 : 0xFFFFFFFF;
+            bird.mutate().setTint(onAccent);
         }
         dotSize = Math.round(density * 8);
         dot = new View(context);
         GradientDrawable shape = new GradientDrawable();
         shape.setShape(GradientDrawable.OVAL);
-        shape.setColor(ResourcesCompat.getColor(getResources(), AppTheme.isHighContrast(context) ? R.color.nj_hc_color_moon : R.color.nj_color_moon, null));
+        shape.setColor(palette.accent);
         dot.setBackground(shape);
         dot.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
         addView(dot, new LayoutParams(dotSize, dotSize));
@@ -128,11 +130,16 @@ public class OrbitView extends FrameLayout {
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         if (!drawMoon || w == 0 || h == 0) return;
+        AppThemePalette palette = AppThemePalette.getCurrent(getContext());
         float r = moonRadius();
         moon.setShader(new LinearGradient(0, h / 2f - r, 0, h / 2f + r,
-                ResourcesCompat.getColor(getResources(), R.color.nj_color_moon_hi, null),
-                ResourcesCompat.getColor(getResources(), R.color.nj_color_moon_lo, null), Shader.TileMode.CLAMP));
-        glow.setShader(new RadialGradient(w / 2f, h / 2f, r * GLOW_REACH, new int[] {0x66F2A93B, 0x2EF2A93B, 0x00F2A93B},
+                palette.highlight, palette.accent, Shader.TileMode.CLAMP));
+        glow.setShader(new RadialGradient(w / 2f, h / 2f, r * GLOW_REACH,
+                new int[] {
+                        AppThemePalette.withAlphaInt(palette.accent, 0x66),
+                        AppThemePalette.withAlphaInt(palette.accent, 0x2E),
+                        AppThemePalette.withAlphaInt(palette.accent, 0x00)
+                },
                 new float[] {0.6f, 0.76f, 1f}, Shader.TileMode.CLAMP));
     }
 

@@ -47,20 +47,22 @@ public final class PcKeyboardView extends View {
         float density = context.getResources().getDisplayMetrics().density;
         gap = Math.max(1.5f, 2 * density);
         boolean highContrast = AppTheme.isHighContrast(context);
-        Context glass = StreamGlass.themed(context);
-        key = color(context, R.color.nj_color_surface_high);
-        keyModifier = color(context, R.color.nj_color_surface);
-        keyPressed = color(context, R.color.nj_color_surface_bright);
+        AppThemePalette palette = AppThemePalette.getCurrent(context);
+        key = AppThemePalette.withAlphaInt(palette.surfaceVariant, 0xEC);
+        keyModifier = AppThemePalette.withAlphaInt(palette.surface, 0xEC);
+        keyPressed = AppThemePalette.withAlphaInt(AppThemePalette.blendColors(palette.surfaceVariant, palette.accent, 0.35f), 0xF2);
         armed = androidx.core.graphics.ColorUtils.compositeColors(
-                com.google.android.material.color.MaterialColors.getColor(glass, R.attr.glassSelectedFill, 0x47F2A93B), key);
-        labelArmed = com.google.android.material.color.MaterialColors.getColor(glass, R.attr.glassOnSelected, 0xFFFFD79A);
-        locked = color(context, highContrast ? R.color.nj_hc_color_moon : R.color.nj_color_moon);
-        labelLocked = color(context, highContrast ? R.color.nj_hc_color_on_moon : R.color.nj_color_on_moon);
-        focus = color(context, highContrast ? R.color.nj_hc_focus_ring_color : R.color.nj_focus_ring_color);
-        focusOnLocked = color(context, highContrast ? R.color.nj_hc_color_on_moon : R.color.nj_color_on_moon);
-        rim = highContrast ? color(context, R.color.nj_hc_color_rim) : 0;
-        label = color(context, highContrast ? R.color.nj_hc_color_label : R.color.nj_color_label);
-        labelSecondary = highContrast ? label : color(context, R.color.nj_color_label_secondary);
+                AppThemePalette.withAlphaInt(palette.accent, 0x47), key);
+        labelArmed = palette.highlight;
+        locked = palette.accent;
+        int onAccent = androidx.core.graphics.ColorUtils.calculateLuminance(palette.accent) > 0.45
+                ? 0xFF0B0E14 : 0xFFFFFFFF;
+        labelLocked = onAccent;
+        focus = palette.highlight;
+        focusOnLocked = onAccent;
+        rim = highContrast ? palette.getPrimaryTextColor() : palette.getCardRimColor();
+        label = palette.getPrimaryTextColor();
+        labelSecondary = highContrast ? label : palette.getSecondaryTextColor();
         stroke.setStyle(Paint.Style.STROKE);
         text.setTextAlign(Paint.Align.CENTER);
         text.setTypeface(Typeface.DEFAULT_BOLD);

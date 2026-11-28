@@ -273,6 +273,13 @@ public class FileTransferActivity extends NightjarActivity implements FileTransf
         page.setOrientation(LinearLayout.VERTICAL);
         int pad = dp(16);
         page.setPadding(pad, pad, pad, pad);
+        if (!com.limelight.ui.PortalBackgroundHelper.isRobolectric()) {
+            com.limelight.ui.OneUiThemeApplier.applyFrostedCard(
+                    page,
+                    com.limelight.ui.PortalBackgroundHelper.getShaderView(this),
+                    com.limelight.ui.FlowingAuroraView.CornerMode.ALL,
+                    22f);
+        }
         scroll.addView(page);
 
         status = text(page, android.R.style.TextAppearance_Material_Body1);

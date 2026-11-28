@@ -107,8 +107,24 @@ public final class OneUiThemeApplier {
         if (view instanceof PcCardSurface) {
             ((PcCardSurface) view).refreshTheme(psv);
         }
-        if (view.getId() == R.id.home_setup_card && !(view instanceof GlassSurface)) {
+        int viewId = view.getId();
+        if (viewId == R.id.home_setup_card && !(view instanceof GlassSurface)) {
             applyFrostedCard(view, psv, FlowingAuroraView.CornerMode.ALL, 20f);
+        } else if (viewId == R.id.detail_sheet || viewId == R.id.detail_profile || viewId == R.id.hero_panel) {
+            applyFrostedCard(view, psv, FlowingAuroraView.CornerMode.ALL, 22f);
+        } else if (viewId == R.id.hero_chip_state || viewId == R.id.hero_chip_store) {
+            applyFrostedCard(view, psv, FlowingAuroraView.CornerMode.ALL, 999f);
+        } else if (view instanceof androidx.appcompat.widget.SearchView
+                && (viewId == R.id.library_search || viewId == R.id.settings_search)) {
+            applyFrostedCard(view, psv, FlowingAuroraView.CornerMode.ALL, 18f);
+        } else if (view instanceof com.google.android.material.card.MaterialCardView
+                && viewId != R.id.grid_card) {
+            com.google.android.material.card.MaterialCardView card =
+                    (com.google.android.material.card.MaterialCardView) view;
+            card.setCardBackgroundColor(Color.TRANSPARENT);
+            card.setStrokeWidth(0);
+            card.setCardElevation(0f);
+            applyFrostedCard(card, psv, FlowingAuroraView.CornerMode.ALL, 18f);
         }
         if (view instanceof GroupedListView) {
             view.setBackgroundColor(Color.TRANSPARENT);
@@ -116,8 +132,21 @@ public final class OneUiThemeApplier {
                 ((ListView) view).setCacheColorHint(Color.TRANSPARENT);
             }
         }
-        if (view.getId() == R.id.home_foot_fade || view.getId() == R.id.pc_foot_fade) {
+        if (viewId == R.id.home_foot_fade || viewId == R.id.pc_foot_fade) {
             view.setVisibility(View.GONE);
+        }
+
+        // Theme Chips
+        if (view instanceof com.google.android.material.chip.Chip) {
+            styleChip((com.google.android.material.chip.Chip) view, palette);
+            return;
+        }
+
+        // Theme plain MaterialButtons (skip GlassButton and buttons already using GlassControlDrawable)
+        if (view instanceof com.google.android.material.button.MaterialButton
+                && !(view.getBackground() instanceof GlassControlDrawable)) {
+            styleMaterialButton((com.google.android.material.button.MaterialButton) view, palette);
+            return;
         }
 
         // Theme switches, checkboxes, sliders, progress bars
@@ -192,6 +221,69 @@ public final class OneUiThemeApplier {
             for (int i = 0; i < vg.getChildCount(); i++) {
                 applyRecursive(activity, vg.getChildAt(i), palette, psv);
             }
+        }
+    }
+
+    /** Themes a Material Chip with active AppThemePalette colors. */
+    public static void styleChip(com.google.android.material.chip.Chip chip, AppThemePalette palette) {
+        int[][] states = {new int[]{android.R.attr.state_checked}, new int[]{}};
+        int checkedFill = AppThemePalette.withAlphaInt(palette.accent, 0x5C);
+        int uncheckedFill = palette.getFrostedCardTint(0x42121826);
+        chip.setChipBackgroundColor(new ColorStateList(states, new int[]{checkedFill, uncheckedFill}));
+        chip.setChipStrokeColor(new ColorStateList(states, new int[]{palette.highlight, palette.getCardRimColor()}));
+        chip.setChipStrokeWidth(Math.max(1f, UiHelper.dpToPx(chip.getContext(), 1f)));
+        ColorStateList textColors = new ColorStateList(states, new int[]{palette.highlight, palette.getPrimaryTextColor()});
+        chip.setTextColor(textColors);
+        chip.setChipIconTint(textColors);
+        chip.setCloseIconTint(textColors);
+        chip.setRippleColor(ColorStateList.valueOf(AppThemePalette.withAlphaInt(palette.accent, 0x33)));
+    }
+
+    /** Themes a plain MaterialButton (non-GlassButton) with active AppThemePalette colors. */
+    public static void styleMaterialButton(com.google.android.material.button.MaterialButton btn, AppThemePalette palette) {
+        int currentText = btn.getCurrentTextColor();
+        if (isDangerRed(currentText)) {
+            return;
+        }
+        ColorStateList bgTint = btn.getBackgroundTintList();
+        int bgColor = bgTint != null ? bgTint.getDefaultColor() : Color.TRANSPARENT;
+        int alpha = Color.alpha(bgColor);
+        boolean hasStroke = btn.getStrokeWidth() > 0;
+        ColorStateList ripple = ColorStateList.valueOf(AppThemePalette.withAlphaInt(palette.accent, 0x33));
+        btn.setRippleColor(ripple);
+
+        if (alpha == 0 && !hasStroke) {
+            // Text button
+            btn.setTextColor(palette.highlight);
+            btn.setIconTint(ColorStateList.valueOf(palette.highlight));
+            return;
+        }
+        if (hasStroke && alpha < 0x80) {
+            // Outlined button
+            btn.setBackgroundTintList(ColorStateList.valueOf(palette.getFrostedCardTint(0x38121826)));
+            btn.setStrokeColor(ColorStateList.valueOf(palette.getCardRimColor()));
+            btn.setTextColor(palette.getPrimaryTextColor());
+            btn.setIconTint(ColorStateList.valueOf(palette.getPrimaryTextColor()));
+            return;
+        }
+        // Distinguish filled primary (saturated/accent) vs tonal/neutral container
+        float[] hsv = new float[3];
+        Color.colorToHSV(bgColor | 0xFF000000, hsv);
+        boolean isPrimaryFilled = !hasStroke && hsv[1] >= 0.35f;
+        if (isPrimaryFilled) {
+            btn.setBackgroundTintList(ColorStateList.valueOf(palette.accent));
+            int onAccent = androidx.core.graphics.ColorUtils.calculateLuminance(palette.accent) > 0.45
+                    ? 0xFF0B0E14 : 0xFFFFFFFF;
+            btn.setTextColor(onAccent);
+            btn.setIconTint(ColorStateList.valueOf(onAccent));
+        } else {
+            btn.setBackgroundTintList(ColorStateList.valueOf(palette.getFrostedCardTint(0x52121826)));
+            btn.setStrokeColor(ColorStateList.valueOf(palette.getCardRimColor()));
+            if (btn.getStrokeWidth() <= 0) {
+                btn.setStrokeWidth(Math.max(1, Math.round(UiHelper.dpToPx(btn.getContext(), 1f))));
+            }
+            btn.setTextColor(palette.getPrimaryTextColor());
+            btn.setIconTint(ColorStateList.valueOf(palette.getPrimaryTextColor()));
         }
     }
 

@@ -1091,13 +1091,17 @@ final class PadPainter {
         stroke.setStrokeWidth(1.75f * density);
         switch (control) {
             case SELECT: {
-                float w = g * 1.1f, h = g * .85f, o = g * .35f;
-                rect.set(cx - w / 2 - o, cy - h / 2 - o, cx + w / 2 - o, cy + h / 2 - o);
-                canvas.drawRoundRect(rect, g * .15f, g * .15f, stroke);
+                float w = g * 1.1f, h = g * .85f, o = g * .35f, cr = g * .15f;
+                rect.set(cx - w / 2 + o, cy - h / 2 + o, cx + w / 2 + o, cy + h / 2 + o);
+                clip.reset();
+                clip.addRoundRect(rect, cr, cr, Path.Direction.CW);
+                int saved = canvas.save();
+                clipOut(canvas, clip);
+                rect.offset(-2 * o, -2 * o);
+                canvas.drawRoundRect(rect, cr, cr, stroke);
+                canvas.restoreToCount(saved);
                 rect.offset(2 * o, 2 * o);
-                fill.setColor(blend(glassHeldFill | 0xFF000000, glassPressedFill, level));
-                canvas.drawRoundRect(rect, g * .15f, g * .15f, fill);
-                canvas.drawRoundRect(rect, g * .15f, g * .15f, stroke);
+                canvas.drawRoundRect(rect, cr, cr, stroke);
                 break;
             }
             case START: {

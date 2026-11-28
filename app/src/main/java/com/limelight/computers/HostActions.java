@@ -274,8 +274,8 @@ public final class HostActions {
             pairingText.setSpan(new android.text.style.RelativeSizeSpan(2.25f), pinStart, pairingText.length(), 0);
             pairingText.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), pinStart, pairingText.length(), 0);
             // The PIN is what the user reads off this screen, so it takes the accent colour.
-            pairingText.setSpan(new android.text.style.ForegroundColorSpan(com.google.android.material.color.MaterialColors
-                    .getColor(activity, androidx.appcompat.R.attr.colorPrimary, android.graphics.Color.WHITE)),
+            pairingText.setSpan(new android.text.style.ForegroundColorSpan(
+                    com.limelight.ui.AppThemePalette.getCurrent(activity).accent),
                     pinStart, pairingText.length(), 0);
         } else {
             pairingText.append(activity.getString(R.string.pairing));
